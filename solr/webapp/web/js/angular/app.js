@@ -369,8 +369,32 @@ solrAdminApp.config([
 
   return {request: started, response: ended, responseError: failed};
 })
+.factory('authInterceptor', function($q, $rootScope, $timeout, $injector) {
+  var started = function(config) {
+    config.headers['Authorization'] = "Basic c29scjpTb2xyUm9ja3M="; // solr / solrRocks
+    console.log("Added authorization header");
+    return config || $q.when(config);
+  };
+
+  var ended = function(response) {
+    if (response.headers['WWW-Authenticate'] != null) {
+      console.log("Got WWW-Authenticate header");
+      alert("WWW-Authenticate: " + response.headers['WWW-Authenticate']);
+    }
+    return response || $q.when(response);
+  };
+
+  var failed = function(rejection) {
+    console.log("Failed with rejection " + rejection);
+    $rootScope.$broadcast('loadingStatusInactive');
+    return $q.reject(rejection);
+  };
+
+  return {request: started, response: ended, responseError: failed};
+})
 .config(function($httpProvider) {
   $httpProvider.interceptors.push("httpInterceptor");
+  $httpProvider.interceptors.push("authInterceptor");
 })
 .directive('fileModel', function ($parse) {
     return {
