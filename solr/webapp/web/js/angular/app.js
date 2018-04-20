@@ -398,7 +398,7 @@ solrAdminApp.config([
 })
 .config(function($httpProvider) {
   $httpProvider.interceptors.push("httpInterceptor");
-  $httpProvider.interceptors.push("authInterceptor");
+  //$httpProvider.interceptors.push("authInterceptor");
   // Tell the BasicAuth plugin that we are Admin UI so it can serve us a 'Authorization: xBasic xxxx' header
   // so that the browser will not intercept the login dialogue
   $httpProvider.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
