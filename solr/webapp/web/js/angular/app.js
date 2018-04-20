@@ -371,21 +371,25 @@ solrAdminApp.config([
 })
 .factory('authInterceptor', function($q, $rootScope, $timeout, $injector) {
   var started = function(config) {
-    config.headers['Authorization'] = "Basic c29scjpTb2xyUm9ja3M="; // solr / solrRocks
-    console.log("Added authorization header");
+    var ah = "Basic c29scjpzb2xyUm9ja3M=";  // solr / solrRocks
+    config.headers['Authorization'] = ah;
+    console.log("Added authorization header " + ah);
     return config || $q.when(config);
   };
 
   var ended = function(response) {
+    console.log("Response headers: " + JSON.stringify(response.headers, undefined, 2));
     if (response.headers['WWW-Authenticate'] != null) {
-      console.log("Got WWW-Authenticate header");
-      alert("WWW-Authenticate: " + response.headers['WWW-Authenticate']);
+      console.log("Got WWW-Authenticate header: " + response.headers['WWW-Authenticate']);
     }
     return response || $q.when(response);
   };
 
   var failed = function(rejection) {
-    console.log("Failed with rejection " + rejection);
+    console.log("Failed with rejection " + JSON.stringify(rejection, undefined, 2));
+    if (rejection.status === 401) {
+      console.log("Status code is 401");
+    }
     $rootScope.$broadcast('loadingStatusInactive');
     return $q.reject(rejection);
   };
@@ -395,6 +399,9 @@ solrAdminApp.config([
 .config(function($httpProvider) {
   $httpProvider.interceptors.push("httpInterceptor");
   $httpProvider.interceptors.push("authInterceptor");
+  // Tell the BasicAuth plugin that we are Admin UI so it can serve us a 'Authorization: xBasic xxxx' header
+  // so that the browser will not intercept the login dialogue
+  $httpProvider.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
 })
 .directive('fileModel', function ($parse) {
     return {
