@@ -171,11 +171,3 @@
 #SOLR_RECOMMENDED_MAX_PROCESSES=
 #SOLR_ULIMIT_CHECKS=
 
-
-# The following lines added by ./solr for enabling BasicAuth
-# SOLR_AUTH_TYPE="basic"
-# SOLR_AUTHENTICATION_OPTS="-Dsolr.httpclient.config=/Users/janhoy/git/lucene-solr/solr/server/solr/basicAuth.conf"
-
-# The following lines added by ./solr for enabling BasicAuth
-SOLR_AUTH_TYPE="basic"
-SOLR_AUTHENTICATION_OPTS="-Dsolr.httpclient.config=/Users/janhoy/git/lucene-solr/solr/server/solr/basicAuth.conf"
