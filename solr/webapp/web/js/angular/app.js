@@ -371,7 +371,7 @@ solrAdminApp.config([
 })
 .factory('authInterceptor', function($q, $rootScope, $timeout, $injector) {
   var started = function(config) {
-    var ah = "Basic c29scjpzb2xyUm9ja3M=";  // solr / solrRocks
+    var ah = "Basic c29scjpTb2xyUm9ja3M=";  // solr / SolrRocks
     config.headers['Authorization'] = ah;
     console.log("Added authorization header " + ah);
     return config || $q.when(config);
@@ -389,6 +389,8 @@ solrAdminApp.config([
     console.log("Failed with rejection " + JSON.stringify(rejection, undefined, 2));
     if (rejection.status === 401) {
       console.log("Status code is 401");
+    } else {
+      console.log("Rejection status is " + rejection.status)
     }
     $rootScope.$broadcast('loadingStatusInactive');
     return $q.reject(rejection);
@@ -398,7 +400,7 @@ solrAdminApp.config([
 })
 .config(function($httpProvider) {
   $httpProvider.interceptors.push("httpInterceptor");
-  //$httpProvider.interceptors.push("authInterceptor");
+  $httpProvider.interceptors.push("authInterceptor");
   // Tell the BasicAuth plugin that we are Admin UI so it can serve us a 'Authorization: xBasic xxxx' header
   // so that the browser will not intercept the login dialogue
   $httpProvider.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
