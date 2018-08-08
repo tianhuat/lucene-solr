@@ -92,10 +92,12 @@ public class ReplicaInfo implements MapWriter {
     });
   }
 
+  /** Replica "coreNode" name. */
   public String getName() {
     return name;
   }
 
+  /** SolrCore name. */
   public String getCore() {
     return core;
   }
@@ -136,6 +138,24 @@ public class ReplicaInfo implements MapWriter {
 
   public Object getVariable(String name) {
     return variables.get(name);
+  }
+
+  public Object getVariable(String name, Object defValue) {
+    Object o = variables.get(name);
+    if (o != null) {
+      return o;
+    } else {
+      return defValue;
+    }
+  }
+
+  public boolean getBool(String name, boolean defValue) {
+    Object o = getVariable(name, defValue);
+    if (o instanceof Boolean) {
+      return (Boolean)o;
+    } else {
+      return Boolean.parseBoolean(String.valueOf(o));
+    }
   }
 
   @Override

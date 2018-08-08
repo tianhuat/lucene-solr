@@ -19,8 +19,6 @@ package org.apache.lucene.search;
 
 import java.io.IOException;
 
-import org.apache.lucene.util.BytesRef;
-
 class AssertingMatchesIterator implements MatchesIterator {
 
   private final MatchesIterator in;
@@ -70,8 +68,14 @@ class AssertingMatchesIterator implements MatchesIterator {
   }
 
   @Override
-  public BytesRef term() {
+  public MatchesIterator getSubMatches() throws IOException {
     assert state == State.ITERATING : state;
-    return in.term();
+    return in.getSubMatches();
+  }
+
+  @Override
+  public Query getQuery() {
+    assert state == State.ITERATING : state;
+    return in.getQuery();
   }
 }

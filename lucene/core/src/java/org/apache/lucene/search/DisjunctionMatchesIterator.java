@@ -45,14 +45,14 @@ final class DisjunctionMatchesIterator implements MatchesIterator {
    *
    * Only terms that have at least one match in the given document will be included
    */
-  static MatchesIterator fromTerms(LeafReaderContext context, int doc, String field, List<Term> terms) throws IOException {
+  static MatchesIterator fromTerms(LeafReaderContext context, int doc, Query query, String field, List<Term> terms) throws IOException {
     Objects.requireNonNull(field);
     for (Term term : terms) {
       if (Objects.equals(field, term.field()) == false) {
         throw new IllegalArgumentException("Tried to generate iterator from terms in multiple fields: expected [" + field + "] but got [" + term.field() + "]");
       }
     }
-    return fromTermsEnum(context, doc, field, asBytesRefIterator(terms));
+    return fromTermsEnum(context, doc, query, field, asBytesRefIterator(terms));
   }
 
   private static BytesRefIterator asBytesRefIterator(List<Term> terms) {
@@ -72,7 +72,7 @@ final class DisjunctionMatchesIterator implements MatchesIterator {
    *
    * Only terms that have at least one match in the given document will be included
    */
-  static MatchesIterator fromTermsEnum(LeafReaderContext context, int doc, String field, BytesRefIterator terms) throws IOException {
+  static MatchesIterator fromTermsEnum(LeafReaderContext context, int doc, Query query, String field, BytesRefIterator terms) throws IOException {
     Objects.requireNonNull(field);
     List<MatchesIterator> mis = new ArrayList<>();
     Terms t = context.reader().terms(field);
@@ -84,8 +84,7 @@ final class DisjunctionMatchesIterator implements MatchesIterator {
       if (te.seekExact(term)) {
         PostingsEnum pe = te.postings(reuse, PostingsEnum.OFFSETS);
         if (pe.advance(doc) == doc) {
-          // TODO do we want to use the copied term here, or instead create a label that associates all of the TMIs with a single term?
-          mis.add(new TermMatchesIterator(BytesRef.deepCopyOf(term), pe));
+          mis.add(new TermMatchesIterator(query, pe));
           reuse = null;
         }
         else {
@@ -114,7 +113,7 @@ final class DisjunctionMatchesIterator implements MatchesIterator {
       protected boolean lessThan(MatchesIterator a, MatchesIterator b) {
         return a.startPosition() < b.startPosition() ||
             (a.startPosition() == b.startPosition() && a.endPosition() < b.endPosition()) ||
-            (a.startPosition() == b.startPosition() && a.endPosition() == b.endPosition() && a.term().compareTo(b.term()) < 0);
+            (a.startPosition() == b.startPosition() && a.endPosition() == b.endPosition());
       }
     };
     for (MatchesIterator mi : matches) {
@@ -160,8 +159,12 @@ final class DisjunctionMatchesIterator implements MatchesIterator {
   }
 
   @Override
-  public BytesRef term() {
-    return queue.top().term();
+  public MatchesIterator getSubMatches() throws IOException {
+    return queue.top().getSubMatches();
   }
 
+  @Override
+  public Query getQuery() {
+    return queue.top().getQuery();
+  }
 }
