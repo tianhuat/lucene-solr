@@ -410,10 +410,13 @@ solrAdminApp.config([
   // so that the browser will not interfer with the login dialogue
   $httpProvider.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
 })
+    
+    
 // NOCOMMIT: just for testing     
 .run(['$rootScope', '$location', '$cookieStore', '$http',
   function ($rootScope, $location, $cookieStore, $http) {
     // keep user logged in after page refresh
+    // Replace with interceptor
     $rootScope.globals = $cookieStore.get('globals') || {};
     if ($rootScope.globals.currentUser) {
       $http.defaults.headers.common['Authorization'] = 'Basic ' + $rootScope.globals.currentUser.authdata; // jshint ignore:line
@@ -426,6 +429,8 @@ solrAdminApp.config([
       }
     });
   }])
+
+    
 .directive('fileModel', function ($parse) {
   return {
     restrict: 'A',

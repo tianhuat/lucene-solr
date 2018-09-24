@@ -23,14 +23,17 @@ solrAdminApp.controller('LoginController',
 
         $scope.login = function () {
           $scope.dataLoading = true;
-          AuthenticationService.Login($scope.username, $scope.password, function (response) {
-            if (response.success) {
-              AuthenticationService.SetCredentials($scope.username, $scope.password);
-              $location.path('/');
-            } else {
-              $scope.error = response.message;
-              $scope.dataLoading = false;
-            }
-          });
+          AuthenticationService.SetCredentials($scope.username, $scope.password);
+          $location.path('/');
+          // TODO: "login" by hitting the failing URL again
+          // AuthenticationService.Login($scope.username, $scope.password, function (response) {
+          //   if (response.success) {
+          //     AuthenticationService.SetCredentials($scope.username, $scope.password);
+          //     $location.path('/');
+          //   } else {
+          //     $scope.error = response.message;
+          //     $scope.dataLoading = false;
+          //   }
+          // });
         };
       }]);
