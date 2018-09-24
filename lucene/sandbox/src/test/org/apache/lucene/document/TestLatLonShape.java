@@ -17,6 +17,7 @@
 package org.apache.lucene.document;
 
 import com.carrotsearch.randomizedtesting.generators.RandomNumbers;
+import org.apache.lucene.document.LatLonShape.QueryRelation;
 import org.apache.lucene.geo.GeoTestUtil;
 import org.apache.lucene.geo.Line;
 import org.apache.lucene.geo.Polygon;
@@ -52,7 +53,7 @@ public class TestLatLonShape extends LuceneTestCase {
   }
 
   protected Query newRectQuery(String field, double minLat, double maxLat, double minLon, double maxLon) {
-    return LatLonShape.newBoxQuery(field, minLat, maxLat, minLon, maxLon);
+    return LatLonShape.newBoxQuery(field, QueryRelation.INTERSECTS, minLat, maxLat, minLon, maxLon);
   }
 
   @Ignore
@@ -195,6 +196,29 @@ public class TestLatLonShape extends LuceneTestCase {
 
     // search a bbox in the hole
     q = newRectQuery(FIELDNAME, inner.minLat + 1e-6, inner.maxLat - 1e-6, inner.minLon + 1e-6, inner.maxLon - 1e-6);
+    assertEquals(0, searcher.count(q));
+
+    IOUtils.close(reader, dir);
+  }
+
+  public void testLUCENE8454() throws Exception {
+    Directory dir = newDirectory();
+    RandomIndexWriter writer = new RandomIndexWriter(random(), dir);
+
+    Polygon poly = new Polygon(new double[] {-1.490648725633769E-132d, 90d, 90d, -1.490648725633769E-132d},
+        new double[] {0d, 0d, 180d, 0d});
+
+    Document document = new Document();
+    addPolygonsToDoc(FIELDNAME, document, poly);
+    writer.addDocument(document);
+
+    ///// search //////
+    IndexReader reader = writer.getReader();
+    writer.close();
+    IndexSearcher searcher = newSearcher(reader);
+
+    // search a bbox in the hole
+    Query q = LatLonShape.newBoxQuery(FIELDNAME, QueryRelation.DISJOINT,-29.46555603761226d, 0.0d, 8.381903171539307E-8d, 0.9999999403953552d);
     assertEquals(0, searcher.count(q));
 
     IOUtils.close(reader, dir);

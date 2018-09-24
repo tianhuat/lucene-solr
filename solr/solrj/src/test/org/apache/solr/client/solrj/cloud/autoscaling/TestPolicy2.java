@@ -18,7 +18,9 @@
 package org.apache.solr.client.solrj.cloud.autoscaling;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.lang.invoke.MethodHandles;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -30,6 +32,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.google.common.collect.ImmutableSet;
 import org.apache.solr.SolrTestCaseJ4;
 import org.apache.solr.client.solrj.cloud.NodeStateProvider;
 import org.apache.solr.client.solrj.cloud.SolrCloudManager;
@@ -56,13 +59,13 @@ public class TestPolicy2 extends SolrTestCaseJ4 {
         "      'shard1': {" +
         "        'range': '80000000-ffffffff'," +
         "        'replicas': {" +
-        "          'r1': {" +
+        "          'r1': {" +//east
         "            'core': 'r1'," +
         "            'base_url': 'http://10.0.0.4:8983/solr'," +
         "            'node_name': 'node1'," +
         "            'state': 'active'" +
         "          }," +
-        "          'r2': {" +
+        "          'r2': {" +//west
         "            'core': 'r2'," +
         "            'base_url': 'http://10.0.0.4:7574/solr'," +
         "            'node_name': 'node2'," +
@@ -73,25 +76,25 @@ public class TestPolicy2 extends SolrTestCaseJ4 {
         "      'shard2': {" +
         "        'range': '0-7fffffff'," +
         "        'replicas': {" +
-        "          'r3': {" +
+        "          'r3': {" +//east
         "            'core': 'r3'," +
         "            'base_url': 'http://10.0.0.4:8983/solr'," +
         "            'node_name': 'node1'," +
         "            'state': 'active'" +
         "          }," +
-        "          'r4': {" +
+        "          'r4': {" +//west
         "            'core': 'r4'," +
         "            'base_url': 'http://10.0.0.4:8987/solr'," +
         "            'node_name': 'node4'," +
         "            'state': 'active'" +
         "          }," +
-        "          'r6': {" +
+        "          'r6': {" +//east
         "            'core': 'r6'," +
         "            'base_url': 'http://10.0.0.4:8989/solr'," +
         "            'node_name': 'node3'," +
         "            'state': 'active'" +
         "          }," +
-        "          'r5': {" +
+        "          'r5': {" +//east
         "            'core': 'r5'," +
         "            'base_url': 'http://10.0.0.4:8983/solr'," +
         "            'node_name': 'node1'," +
@@ -125,7 +128,7 @@ public class TestPolicy2 extends SolrTestCaseJ4 {
     Policy.Session session = policy.createSession(createCloudManager(state, metaData));
     List<Violation> violations = session.getViolations();
     assertEquals(1, violations.size());
-    assertEquals(4, violations.get(0).getViolatingReplicas().size());
+    assertEquals(3, violations.get(0).getViolatingReplicas().size());
     assertEquals(1.0, violations.get(0).replicaCountDelta, 0.01);
     for (Violation.ReplicaInfoAndErr r : violations.get(0).getViolatingReplicas()) {
       assertEquals("shard2", r.replicaInfo.getShard());
@@ -138,7 +141,7 @@ public class TestPolicy2 extends SolrTestCaseJ4 {
     session = policy.createSession(createCloudManager(state, metaData));
     violations = session.getViolations();
     assertEquals(1, violations.size());
-    assertEquals(4, violations.get(0).getViolatingReplicas().size());
+    assertEquals(3, violations.get(0).getViolatingReplicas().size());
     assertEquals(1.0, violations.get(0).replicaCountDelta, 0.01);
     for (Violation.ReplicaInfoAndErr r : violations.get(0).getViolatingReplicas()) {
       assertEquals("shard2", r.replicaInfo.getShard());
@@ -286,6 +289,98 @@ public class TestPolicy2 extends SolrTestCaseJ4 {
         };
       }
     };
+  }
+
+  public void testAutoScalingHandlerFailure() throws IOException {
+    Map<String, Object> m = (Map<String, Object>) loadFromResource("testAutoScalingHandlerFailure.json");
+
+    Policy policy = new Policy((Map<String, Object>) Utils.getObjectByPath(m, false, "diagnostics/config"));
+    SolrCloudManager cloudManagerFromDiagnostics = createCloudManagerFromDiagnostics(m);
+    Policy.Session session = policy.createSession(cloudManagerFromDiagnostics);
+    List<Suggester.SuggestionInfo> suggestions = PolicyHelper.getSuggestions(new AutoScalingConfig((Map<String, Object>) Utils.getObjectByPath(m, false, "diagnostics/config")), cloudManagerFromDiagnostics);
+    assertEquals(2, suggestions.size());
+
+  }
+
+  static SolrCloudManager createCloudManagerFromDiagnostics(Map<String, Object> m) {
+    List<Map> sortedNodes = (List<Map>) Utils.getObjectByPath(m, false, "diagnostics/sortedNodes");
+    Set<String> liveNodes = new HashSet<>();
+    SolrClientNodeStateProvider nodeStateProvider = new SolrClientNodeStateProvider(null) {
+      @Override
+      protected void readReplicaDetails() {
+        for (Object o : sortedNodes) {
+          String node = (String) ((Map) o).get("node");
+          liveNodes.add(node);
+          Map nodeDetails = nodeVsCollectionVsShardVsReplicaInfo.computeIfAbsent(node, s -> new LinkedHashMap<>());
+          Map<String, Map<String, List<Map>>> replicas = (Map<String, Map<String, List<Map>>>) ((Map) o).get("replicas");
+          replicas.forEach((coll, shardVsReplicas) -> shardVsReplicas
+              .forEach((shard, repDetails) -> {
+                List<ReplicaInfo> reps = (List) ((Map) nodeDetails
+                    .computeIfAbsent(coll, o1 -> new LinkedHashMap<>()))
+                    .computeIfAbsent(shard, o12 -> new ArrayList<ReplicaInfo>());
+                for (Map map : repDetails) reps.add(new ReplicaInfo(map));
+              }));
+        }
+
+      }
+
+      @Override
+      public Map<String, Map<String, List<ReplicaInfo>>> getReplicaInfo(String node, Collection<String> keys) {
+        return nodeVsCollectionVsShardVsReplicaInfo.get(node) == null ?
+            Collections.emptyMap() :
+            nodeVsCollectionVsShardVsReplicaInfo.get(node);
+      }
+
+      @Override
+      public Map<String, Object> getNodeValues(String node, Collection<String> tags) {
+        for (Map n : sortedNodes) if (n.get("node").equals(node)) return n;
+        return Collections.emptyMap();
+      }
+    };
+    return new DelegatingCloudManager(null) {
+      @Override
+      public NodeStateProvider getNodeStateProvider() {
+        return nodeStateProvider;
+      }
+
+      @Override
+      public ClusterStateProvider getClusterStateProvider() {
+        return new DelegatingClusterStateProvider(null) {
+          @Override
+          public Set<String> getLiveNodes() {
+            return liveNodes;
+          }
+        };
+      }
+    };
+  }
+
+  public void testSysPropSuggestions() throws IOException {
+
+    Map<String, Object> m = (Map<String, Object>) loadFromResource("testSysPropSuggestions.json");
+
+    Map<String, Object> conf = (Map<String, Object>) Utils.getObjectByPath(m, false, "diagnostics/config");
+    Policy policy = new Policy(conf);
+    SolrCloudManager cloudManagerFromDiagnostics = createCloudManagerFromDiagnostics(m);
+    Policy.Session session = policy.createSession(cloudManagerFromDiagnostics);
+    List<Violation> violations = session.getViolations();
+    for (Violation violation : violations) {
+      assertEquals(1.0d, violation.replicaCountDelta.doubleValue(), 0.0001);
+    }
+    assertEquals(2, violations.size());
+    List<Suggester.SuggestionInfo> suggestions = PolicyHelper.getSuggestions(new AutoScalingConfig(conf), cloudManagerFromDiagnostics);
+    assertEquals(2, suggestions.size());
+    for (Suggester.SuggestionInfo suggestion : suggestions) {
+      assertTrue(ImmutableSet.of("127.0.0.1:63219_solr", "127.0.0.1:63229_solr").contains(
+          Utils.getObjectByPath(suggestion, true, "operation/command/move-replica/targetNode")));
+
+    }
+  }
+
+  public static Object loadFromResource(String file) throws IOException {
+    try (InputStream is = TestPolicy2.class.getResourceAsStream("/solrj/solr/autoscaling/" + file)) {
+      return Utils.fromJSON(is);
+    }
   }
 
 }

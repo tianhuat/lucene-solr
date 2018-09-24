@@ -766,9 +766,7 @@ public class TestPolicy extends SolrTestCaseJ4 {
     assertEquals(Operand.EQUAL, REPLICA.getOperand(Operand.EQUAL, "2", null));
     assertEquals(Operand.NOT_EQUAL, REPLICA.getOperand(Operand.NOT_EQUAL, "2", null));
     assertEquals(Operand.RANGE_EQUAL, REPLICA.getOperand(Operand.EQUAL, "2.1", null));
-    assertEquals(Operand.RANGE_NOT_EQUAL, REPLICA.getOperand(Operand.NOT_EQUAL, "2.1", null));
     assertEquals(Operand.RANGE_EQUAL, REPLICA.getOperand(Operand.EQUAL, "2.01", null));
-    assertEquals(Operand.RANGE_NOT_EQUAL, REPLICA.getOperand(Operand.NOT_EQUAL, "2.01", null));
 
     Clause clause = Clause.create("{replica: '1.23', node:'#ANY'}");
     assertTrue(clause.getReplica().isPass(2));
@@ -781,11 +779,9 @@ public class TestPolicy extends SolrTestCaseJ4 {
     assertTrue(clause.getReplica().isPass(0));
     assertFalse(clause.getReplica().isPass(2));
 
-    clause = Clause.create("{replica: '!1.23', node:'#ANY'}");
-    assertFalse(clause.getReplica().isPass(2));
-    assertFalse(clause.getReplica().isPass(1));
-    assertTrue(clause.getReplica().isPass(0));
-    assertTrue(clause.getReplica().isPass(3));
+    expectThrows(IllegalArgumentException.class,
+        () -> Clause.create("{replica: '!1.23', node:'#ANY'}"));
+
 
     clause = Clause.create("{replica: 1.23, node:'#ANY'}");
     assertTrue(clause.getReplica().isPass(2));
@@ -897,6 +893,23 @@ public class TestPolicy extends SolrTestCaseJ4 {
 
     clause = Clause.create("{cores: '14%' , node:[node1, node2, node3]}");
     assertEquals(Operand.IN, clause.getTag().op);
+
+    expectThrows(IllegalArgumentException.class,
+        () -> Clause.create("{replica: '!14%' , node:'#ANY'}"));
+
+    expectThrows(IllegalArgumentException.class,
+        () -> Clause.create("{cores: '!14%' , node:[node1, node2, node3]}"));
+
+    expectThrows(IllegalArgumentException.class,
+        () -> Clause.create("{cores: '!1.66' , node:'#ANY'}"));
+    expectThrows(IllegalArgumentException.class,
+        () -> Clause.create("{replica: '<14%' , node:'#ANY'}"));
+    expectThrows(IllegalArgumentException.class,
+        () -> Clause.create("{replica: '>14%' , node:'#ANY'}"));
+
+    expectThrows(IllegalArgumentException.class,
+        () -> Clause.create("{cores: '>14%' , node:'#ANY'}"));
+
   }
 
 
@@ -1364,9 +1377,9 @@ public class TestPolicy extends SolrTestCaseJ4 {
         "}");
     Map<String, Map> nodeValues = (Map<String, Map>) Utils.fromJSONString("{" +
         "node1:{cores:12, freedisk: 334, heapUsage:10480, rack: rack4, sysprop.fs: slowdisk}," +
-        "node2:{cores:4, freedisk: 749, heapUsage:6873, rack: rack3}," +
+        "node2:{cores:4, freedisk: 749, heapUsage:6873, rack: rack3, sysprop.fs: unknown }," +
         "node3:{cores:7, freedisk: 262, heapUsage:7834, rack: rack2, sysprop.fs : ssd}," +
-        "node4:{cores:8, freedisk: 375, heapUsage:16900, nodeRole:overseer, rack: rack1}" +
+        "node4:{cores:8, freedisk: 375, heapUsage:16900, nodeRole:overseer, rack: rack1, sysprop.fs: unknown}" +
         "}");
     Policy policy = new Policy(policies);
     Suggester suggester = policy.createSession(getSolrCloudManager(nodeValues, clusterState))
@@ -1560,9 +1573,9 @@ public class TestPolicy extends SolrTestCaseJ4 {
         "}");
     Map<String, Map> nodeValues = (Map<String, Map>) Utils.fromJSONString("{" +
         "node1:{cores:12, freedisk: 334, heapUsage:10480, rack: rack4, sysprop.fs: slowdisk}," +
-        "node2:{cores:4, freedisk: 749, heapUsage:6873, rack: rack3}," +
+        "node2:{cores:4, freedisk: 749, heapUsage:6873, rack: rack3, sysprop.fs: unknown}," +
         "node3:{cores:7, freedisk: 262, heapUsage:7834, rack: rack2, sysprop.fs : ssd}," +
-        "node4:{cores:8, freedisk: 375, heapUsage:16900, nodeRole:overseer, rack: rack1}" +
+        "node4:{cores:8, freedisk: 375, heapUsage:16900, nodeRole:overseer, rack: rack1, sysprop.fs: unknown}" +
         "}");
     Policy policy = new Policy(policies);
     Suggester suggester = policy.createSession(getSolrCloudManager(nodeValues, clusterState))
@@ -1876,10 +1889,10 @@ public class TestPolicy extends SolrTestCaseJ4 {
         "      {'minimize':'cores', 'precision':3}," +
         "      {'maximize':'freedisk','precision':100}]}";
     Map<String, Map> nodeValues = (Map<String, Map>) Utils.fromJSONString("{" +
-        "node1:{cores:12, freedisk: 334, heapUsage:10480, rack: rack4}," +
-        "node2:{cores:4, freedisk: 749, heapUsage:6873, rack: rack3}," +
+        "node1:{cores:12, freedisk: 334, heapUsage:10480, rack: rack4, sysprop.fs: slowdisk}," +
+        "node2:{cores:4, freedisk: 749, heapUsage:6873, rack: rack3, sysprop.fs: slowdisk}," +
         "node3:{cores:7, freedisk: 262, heapUsage:7834, rack: rack2, sysprop.fs : ssd}," +
-        "node4:{cores:8, freedisk: 375, heapUsage:16900, nodeRole:overseer, rack: rack1}" +
+        "node4:{cores:8, freedisk: 375, heapUsage:16900, nodeRole:overseer, rack: rack1, sysprop.fs: slowdisk}" +
         "}");
     Policy policy = new Policy((Map<String, Object>) Utils.fromJSONString(autoscaleJson));
     SolrCloudManager cloudManager = getSolrCloudManager(nodeValues, clusterState);
@@ -2437,7 +2450,7 @@ public class TestPolicy extends SolrTestCaseJ4 {
         "      'node':'10.0.0.6:8983_solr'," +
         "      'cores':2}}}";
     autoScalingjson = "  { cluster-policy:[" +
-        "    { replica :'<51%',node:'#ANY' , type: TLOG } ,{ replica :'<51%',node:'#ANY' , type: PULL } ]," +
+        "    { replica :'50%',node:'#ANY' , type: TLOG } ,{ replica :'50%',node:'#ANY' , type: PULL } ]," +
         "  cluster-preferences :[{ minimize : cores }]}";
     autoScalingConfig = new AutoScalingConfig((Map<String, Object>) Utils.fromJSONString(autoScalingjson));
     session = autoScalingConfig.getPolicy().createSession(cloudManagerWithData(dataproviderdata));
@@ -2467,8 +2480,8 @@ public class TestPolicy extends SolrTestCaseJ4 {
         "    }}}";
 
     String autoScalingjson = "  { cluster-policy:[" +
-        "    { replica :'<34%', shard: '#EACH', sysprop.az : east}," +
-        "    { replica :'<67%', shard: '#EACH', sysprop.az : west}" +
+        "    { replica :'33%', shard: '#EACH', sysprop.az : east}," +
+        "    { replica :'67%', shard: '#EACH', sysprop.az : west}" +
         "    ]," +
         "  cluster-preferences :[{ minimize : cores }]}";
 
@@ -2480,6 +2493,7 @@ public class TestPolicy extends SolrTestCaseJ4 {
 
     List<String> nodes = new ArrayList<>();
 
+    int westCount = 0, eastCount = 0;
     for (int i = 0; i < 12; i++) {
       SolrRequest suggestion = txn.getCurrentSession()
           .getSuggester(ADDREPLICA)
@@ -2488,9 +2502,13 @@ public class TestPolicy extends SolrTestCaseJ4 {
       assertNotNull(suggestion);
       String node = suggestion.getParams().get("node");
       nodes.add(node);
+      if ("10.0.0.6:8983_solr".equals(node)) eastCount++;
+      if ("10.0.0.6:7574_solr".equals(node)) westCount++;
       if (i % 3 == 1) assertEquals("10.0.0.6:8983_solr", node);
       else assertEquals("10.0.0.6:7574_solr", node);
     }
+    assertEquals(8, westCount);
+    assertEquals(4, eastCount);
 
     List<Violation> violations = txn.close();
     assertTrue(violations.isEmpty());
@@ -2508,7 +2526,7 @@ public class TestPolicy extends SolrTestCaseJ4 {
   }
 
 
-  public void testFreeDiskSuggestions() {
+  public void testFreeDiskSuggestions() throws IOException {
     String dataproviderdata = "{" +
         "  liveNodes:[node1,node2]," +
         "  replicaInfo : {" +
@@ -2531,7 +2549,7 @@ public class TestPolicy extends SolrTestCaseJ4 {
     List<Violation> violations = cfg.getPolicy().createSession(cloudManagerWithData(dataproviderdata)).getViolations();
     assertEquals(1, violations.size());
     assertEquals(4, violations.get(0).getViolatingReplicas().size());
-    assertEquals(-4, violations.get(0).replicaCountDelta, 0.1);
+    assertEquals(4, violations.get(0).replicaCountDelta, 0.1);
     for (Violation.ReplicaInfoAndErr r : violations.get(0).getViolatingReplicas()) {
       assertEquals(500d, r.delta, 0.1);
 
@@ -2561,11 +2579,8 @@ public class TestPolicy extends SolrTestCaseJ4 {
     assertEquals(1, violations.size());
     assertEquals(-4, violations.get(0).replicaCountDelta, 0.1);
     assertEquals(1, violations.size());
-    assertEquals(4, violations.get(0).getViolatingReplicas().size());
-    for (Violation.ReplicaInfoAndErr r : violations.get(0).getViolatingReplicas()) {
-      assertEquals(500d, r.delta, 0.1);
+    assertEquals(0, violations.get(0).getViolatingReplicas().size());
 
-    }
     l = PolicyHelper.getSuggestions(cfg, cloudManagerWithData(dataproviderdata));
     assertEquals(3, l.size());
     m = l.get(0).toMap(new LinkedHashMap<>());
@@ -2655,7 +2670,7 @@ public class TestPolicy extends SolrTestCaseJ4 {
         "}";
     AutoScalingConfig cfg = new AutoScalingConfig((Map<String, Object>) Utils.fromJSONString(autoScalingjson));
     List<Violation> violations = cfg.getPolicy().createSession(cloudManagerWithData(dataproviderdata)).getViolations();
-    assertEquals(2, violations.size());
+    assertEquals("expected 2 violations", 2, violations.size());
     List<Suggester.SuggestionInfo> suggestions = PolicyHelper.getSuggestions(cfg, cloudManagerWithData(dataproviderdata));
     assertEquals(2, suggestions.size());
     for (Suggester.SuggestionInfo suggestion : suggestions) {
@@ -2874,97 +2889,7 @@ public class TestPolicy extends SolrTestCaseJ4 {
   }
 
   public void testScheduledTriggerFailure() throws Exception {
-    String state = "{" +
-        "  'liveNodes': [" +
-        "    '127.0.0.1:49221_solr'," +
-        "    '127.0.0.1:49210_solr'" +
-        "  ]," +
-        "  'suggester': {" +
-        "    'action': 'MOVEREPLICA'," +
-        "    'hints': {}" +
-        "  }," +
-        "  'replicaInfo': {" +
-        "    '127.0.0.1:49210_solr': {" +
-        "      'testScheduledTrigger': {" +
-        "        'shard1': [" +
-        "          {" +
-        "            'core_node3': {" +
-        "              'base_url': 'http://127.0.0.1:49210/solr'," +
-        "              'node_name': '127.0.0.1:49210_solr'," +
-        "              'core': 'testScheduledTrigger_shard1_replica_n1'," +
-        "              'state': 'active'," +
-        "              'type': 'NRT'," +
-        "              'INDEX.sizeInBytes': 6.426125764846802E-8," +
-        "              'shard': 'shard1'," +
-        "              'collection': 'testScheduledTrigger'" +
-        "            }" +
-        "          }," +
-        "          {" +
-        "            'core_node6': {" +
-        "              'base_url': 'http://127.0.0.1:49210/solr'," +
-        "              'node_name': '127.0.0.1:49210_solr'," +
-        "              'core': 'testScheduledTrigger_shard1_replica_n4'," +
-        "              'state': 'active'," +
-        "              'type': 'NRT'," +
-        "              'INDEX.sizeInBytes': 6.426125764846802E-8," +
-        "              'shard': 'shard1'," +
-        "              'collection': 'testScheduledTrigger'" +
-        "            }" +
-        "          }" +
-        "        ]" +
-        "      }" +
-        "    }," +
-        "    '127.0.0.1:49221_solr': {" +
-        "      'testScheduledTrigger': {" +
-        "        'shard1': [" +
-        "          {" +
-        "            'core_node5': {" +
-        "              'core': 'testScheduledTrigger_shard1_replica_n2'," +
-        "              'leader': 'true'," +
-        "              'INDEX.sizeInBytes': 6.426125764846802E-8," +
-        "              'base_url': 'http://127.0.0.1:49221/solr'," +
-        "              'node_name': '127.0.0.1:49221_solr'," +
-        "              'state': 'active'," +
-        "              'type': 'NRT'," +
-        "              'shard': 'shard1'," +
-        "              'collection': 'testScheduledTrigger'" +
-        "            }" +
-        "          }" +
-        "        ]" +
-        "      }" +
-        "    }" +
-        "  }," +
-        "  'nodeValues': {" +
-        "    '127.0.0.1:49210_solr': {" +
-        "      'node': '127.0.0.1:49210_solr'," +
-        "      'cores': 2," +
-        "      'freedisk': 197.39717864990234" +
-        "    }," +
-        "    '127.0.0.1:49221_solr': {" +
-        "      'node': '127.0.0.1:49221_solr'," +
-        "      'cores': 1," +
-        "      'freedisk': 197.39717864990234" +
-        "    }" +
-        "  }," +
-        "  'autoscalingJson': {" +
-        "    'cluster-preferences': [" +
-        "      {" +
-        "        'minimize': 'cores'," +
-        "        'precision': 1" +
-        "      }," +
-        "      {" +
-        "        'maximize': 'freedisk'" +
-        "      }" +
-        "    ]," +
-        "    'cluster-policy': [" +
-        "      {" +
-        "        'cores': '<3'," +
-        "        'node': '#EACH'" +
-        "      }" +
-        "    ]" +
-        "  }" +
-        "}";
-    Map jsonObj = (Map) Utils.fromJSONString(state);
+    Map jsonObj = (Map) TestPolicy2.loadFromResource("testScheduledTriggerFailure.json");
     SolrCloudManager cloudManager = createCloudManager(jsonObj);
     Suggester suggester = createSuggester(cloudManager, jsonObj, null);
     int count = 0;
@@ -2980,118 +2905,7 @@ public class TestPolicy extends SolrTestCaseJ4 {
   }
 
   public void testUtilizeNodeFailure() throws Exception {
-    String state = "{'liveNodes': ['127.0.0.1:50417_solr', '127.0.0.1:50418_solr', '127.0.0.1:50419_solr', '127.0.0.1:50420_solr', '127.0.0.1:50443_solr']," +
-        "  'suggester': {" +
-        "    'action': 'MOVEREPLICA'," +
-        "    'hints': {'TARGET_NODE': ['127.0.0.1:50443_solr']}" +
-        "  }," +
-        "  'replicaInfo': {" +
-        "    '127.0.0.1:50418_solr': {" +
-        "      'utilizenodecoll': {" +
-        "        'shard2': [" +
-        "          {" +
-        "            'core_node7': {" +
-        "              'core': 'utilizenodecoll_shard2_replica_n4'," +
-        "              'leader': 'true'," +
-        "              'INDEX.sizeInBytes': 6.426125764846802E-8," +
-        "              'base_url': 'http://127.0.0.1:50418/solr'," +
-        "              'node_name': '127.0.0.1:50418_solr'," +
-        "              'state': 'active'," +
-        "              'type': 'NRT'," +
-        "              'shard': 'shard2'," +
-        "              'collection': 'utilizenodecoll'" +
-        "            }" +
-        "          }" +
-        "        ]" +
-        "      }" +
-        "    }," +
-        "    '127.0.0.1:50417_solr': {" +
-        "      'utilizenodecoll': {" +
-        "        'shard2': [" +
-        "          {" +
-        "            'core_node8': {" +
-        "              'base_url': 'http://127.0.0.1:50417/solr'," +
-        "              'node_name': '127.0.0.1:50417_solr'," +
-        "              'core': 'utilizenodecoll_shard2_replica_n6'," +
-        "              'state': 'active'," +
-        "              'type': 'NRT'," +
-        "              'INDEX.sizeInBytes': 6.426125764846802E-8," +
-        "              'shard': 'shard2'," +
-        "              'collection': 'utilizenodecoll'" +
-        "            }" +
-        "          }" +
-        "        ]" +
-        "      }" +
-        "    }," +
-        "    '127.0.0.1:50419_solr': {" +
-        "      'utilizenodecoll': {" +
-        "        'shard1': [" +
-        "          {" +
-        "            'core_node5': {" +
-        "              'base_url': 'http://127.0.0.1:50419/solr'," +
-        "              'node_name': '127.0.0.1:50419_solr'," +
-        "              'core': 'utilizenodecoll_shard1_replica_n2'," +
-        "              'state': 'active'," +
-        "              'type': 'NRT'," +
-        "              'INDEX.sizeInBytes': 6.426125764846802E-8," +
-        "              'shard': 'shard1'," +
-        "              'collection': 'utilizenodecoll'" +
-        "            }" +
-        "          }" +
-        "        ]" +
-        "      }" +
-        "    }," +
-        "    '127.0.0.1:50420_solr': {" +
-        "      'utilizenodecoll': {" +
-        "        'shard1': [" +
-        "          {" +
-        "            'core_node3': {" +
-        "              'core': 'utilizenodecoll_shard1_replica_n1'," +
-        "              'leader': 'true'," +
-        "              'INDEX.sizeInBytes': 6.426125764846802E-8," +
-        "              'base_url': 'http://127.0.0.1:50420/solr'," +
-        "              'node_name': '127.0.0.1:50420_solr'," +
-        "              'state': 'active'," +
-        "              'type': 'NRT'," +
-        "              'shard': 'shard1'," +
-        "              'collection': 'utilizenodecoll'" +
-        "            }" +
-        "          }" +
-        "        ]" +
-        "      }" +
-        "    }," +
-        "    '127.0.0.1:50443_solr': {}" +
-        "  }," +
-        "  'nodeValues': {" +
-        "    '127.0.0.1:50418_solr': {" +
-        "      'cores': 1," +
-        "      'freedisk': 187.70782089233398" +
-        "    }," +
-        "    '127.0.0.1:50417_solr': {" +
-        "      'cores': 1," +
-        "      'freedisk': 187.70782089233398" +
-        "    }," +
-        "    '127.0.0.1:50419_solr': {" +
-        "      'cores': 1," +
-        "      'freedisk': 187.70782089233398" +
-        "    }," +
-        "    '127.0.0.1:50420_solr': {" +
-        "      'cores': 1," +
-        "      'freedisk': 187.70782089233398" +
-        "    }," +
-        "    '127.0.0.1:50443_solr': {" +
-        "      'cores': 0," +
-        "      'freedisk': 187.70782089233398" +
-        "    }" +
-        "  }," +
-        "  'autoscalingJson': {" +
-        "    'cluster-preferences': [" +
-        "      {'minimize': 'cores', 'precision': 1}," +
-        "      {'maximize': 'freedisk'}" +
-        "    ]" +
-        "  }" +
-        "}";
-    Map jsonObj = (Map) Utils.fromJSONString(state);
+    Map jsonObj = (Map) TestPolicy2.loadFromResource("testUtilizeNodeFailure.json"); //(Map) Utils.fromJSONString(state);
     SolrCloudManager cloudManager = createCloudManager(jsonObj);
     Suggester suggester = createSuggester(cloudManager, jsonObj, null);
     int count = 0;
@@ -3107,76 +2921,7 @@ public class TestPolicy extends SolrTestCaseJ4 {
   }
 
   public void testUtilizeNodeFailure2() throws Exception {
-    String state = "{  'liveNodes':[" +
-        "  '127.0.0.1:51075_solr'," +
-        "  '127.0.0.1:51076_solr'," +
-        "  '127.0.0.1:51077_solr'," +
-        "  '127.0.0.1:51097_solr']," +
-        "  'suggester':{" +
-        "    'action':'MOVEREPLICA'," +
-        "    'hints':{'TARGET_NODE':['127.0.0.1:51097_solr']}}," +
-        "  'replicaInfo':{" +
-        "    '127.0.0.1:51076_solr':{'utilizenodecoll':{'shard1':[{'core_node5':{" +
-        "      'base_url':'https://127.0.0.1:51076/solr'," +
-        "      'node_name':'127.0.0.1:51076_solr'," +
-        "      'core':'utilizenodecoll_shard1_replica_n2'," +
-        "      'state':'active'," +
-        "      'type':'NRT'," +
-        "      'INDEX.sizeInBytes':6.426125764846802E-8," +
-        "      'shard':'shard1'," +
-        "      'collection':'utilizenodecoll'}}]}}," +
-        "    '127.0.0.1:51077_solr':{'utilizenodecoll':{" +
-        "      'shard2':[{'core_node8':{" +
-        "        'base_url':'https://127.0.0.1:51077/solr'," +
-        "        'node_name':'127.0.0.1:51077_solr'," +
-        "        'core':'utilizenodecoll_shard2_replica_n6'," +
-        "        'state':'active'," +
-        "        'type':'NRT'," +
-        "        'INDEX.sizeInBytes':6.426125764846802E-8," +
-        "        'shard':'shard2'," +
-        "        'collection':'utilizenodecoll'}}]," +
-        "      'shard1':[{'core_node3':{" +
-        "        'core':'utilizenodecoll_shard1_replica_n1'," +
-        "        'leader':'true'," +
-        "        'INDEX.sizeInBytes':6.426125764846802E-8," +
-        "        'base_url':'https://127.0.0.1:51077/solr'," +
-        "        'node_name':'127.0.0.1:51077_solr'," +
-        "        'state':'active'," +
-        "        'type':'NRT'," +
-        "        'shard':'shard1'," +
-        "        'collection':'utilizenodecoll'}}]}}," +
-        "    '127.0.0.1:51097_solr':{}," +
-        "    '127.0.0.1:51075_solr':{'utilizenodecoll':{'shard2':[{'core_node7':{" +
-        "      'core':'utilizenodecoll_shard2_replica_n4'," +
-        "      'leader':'true'," +
-        "      'INDEX.sizeInBytes':6.426125764846802E-8," +
-        "      'base_url':'https://127.0.0.1:51075/solr'," +
-        "      'node_name':'127.0.0.1:51075_solr'," +
-        "      'state':'active'," +
-        "      'type':'NRT'," +
-        "      'shard':'shard2'," +
-        "      'collection':'utilizenodecoll'}}]}}}," +
-        "  'nodeValues':{" +
-        "    '127.0.0.1:51076_solr':{" +
-        "      'cores':1," +
-        "      'freedisk':188.7262191772461}," +
-        "    '127.0.0.1:51077_solr':{" +
-        "      'cores':2," +
-        "      'freedisk':188.7262191772461}," +
-        "    '127.0.0.1:51097_solr':{" +
-        "      'cores':0," +
-        "      'freedisk':188.7262191772461}," +
-        "    '127.0.0.1:51075_solr':{" +
-        "      'cores':1," +
-        "      'freedisk':188.7262191772461}}," +
-        "  'autoscalingJson':{" +
-        "    'cluster-preferences':[" +
-        "      {" +
-        "        'minimize':'cores'," +
-        "        'precision':1}," +
-        "      {'maximize':'freedisk'}]" +
-        "    }}";
-    Map jsonObj = (Map) Utils.fromJSONString(state);
+    Map jsonObj = (Map) TestPolicy2.loadFromResource("testUtilizeNodeFailure2.json");
     SolrCloudManager cloudManager = createCloudManager(jsonObj);
     Suggester suggester = createSuggester(cloudManager, jsonObj, null);
     int count = 0;
@@ -3192,271 +2937,12 @@ public class TestPolicy extends SolrTestCaseJ4 {
   }
 
   //SOLR-12358
-  public void testSortError() {
+  public void testSortError() throws IOException {
     Policy policy = new Policy((Map<String, Object>) Utils.fromJSONString("{cluster-preferences: [{minimize : cores, precision:1}, " +
         "{maximize : freedisk, precision: 50}, " +
         "{minimize: sysLoadAvg}]}"));
-    String rowsData = "{'sortedNodes':[" +
-        "    {" +
-        "      'node':'solr-01:8983_solr'," +
-        "      'replicas':{}," +
-        "      'isLive':true," +
-        "      'attributes':[" +
-        "        {'cores':2}," +
-        "        {'freedisk':1734.5261459350586}," +
-        "        {'sysLoadAvg':35.0}," +
-        "        {'node':'solr-01:8983_solr'}]}," +
-        "    {" +
-        "      'node':'solr-07:8983_solr'," +
-        "      'replicas':{}," +
-        "      'isLive':true," +
-        "      'attributes':[" +
-        "        {'cores':3}," +
-        "        {'freedisk':1721.5669250488281}," +
-        "        {'sysLoadAvg':10.0}," +
-        "        {'node':'solr-07:8983_solr'}]}," +
-        "    {" +
-        "      'node':'solr-08:8983_solr'," +
-        "      'isLive':true," +
-        "      'attributes':[" +
-        "        {'cores':3}," +
-        "        {'freedisk':1764.9518203735352}," +
-        "        {'sysLoadAvg':330.0}," +
-        "        {'node':'solr-08:8983_solr'}]}," +
-        "    {" +
-        "      'node':'solr-25:8983_solr'," +
-        "      'isLive':true," +
-        "      'attributes':[" +
-        "        {'cores':3}," +
-        "        {'freedisk':1779.7792778015137}," +
-        "        {'sysLoadAvg':304.0}," +
-        "        {'node':'solr-25:8983_solr'}]}," +
-        "    {" +
-        "      'node':'solr-15:8983_solr'," +
-        "      'isLive':true," +
-        "      'attributes':[" +
-        "        {'cores':3}," +
-        "        {'freedisk':1697.5930519104004}," +
-        "        {'sysLoadAvg':277.0}," +
-        "        {'node':'solr-15:8983_solr'}]}," +
-        "    {" +
-        "      'node':'solr-13:8983_solr'," +
-        "      'isLive':true," +
-        "      'attributes':[" +
-        "        {'cores':2}," +
-        "        {'freedisk':1755.1909484863281}," +
-        "        {'sysLoadAvg':265.0}," +
-        "        {'node':'solr-13:8983_solr'}]}," +
-        "    {" +
-        "      'node':'solr-14:8983_solr'," +
-        "      'isLive':true," +
-        "      'attributes':[" +
-        "        {'cores':3}," +
-        "        {'freedisk':1757.6035423278809}," +
-        "        {'sysLoadAvg':61.0}," +
-        "        {'node':'solr-14:8983_solr'}]}," +
-        "    {" +
-        "      'node':'solr-16:8983_solr'," +
-        "      'isLive':true," +
-        "      'attributes':[" +
-        "        {'cores':3}," +
-        "        {'freedisk':1746.081386566162}," +
-        "        {'sysLoadAvg':260.0}," +
-        "        {'node':'solr-16:8983_solr'}]}," +
-        "    {" +
-        "      'node':'solr-04:8983_solr'," +
-        "      'isLive':true," +
-        "      'attributes':[" +
-        "        {'cores':2}," +
-        "        {'freedisk':1708.7230529785156}," +
-        "        {'sysLoadAvg':216.0}," +
-        "        {'node':'solr-04:8983_solr'}]}," +
-        "    {" +
-        "      'node':'solr-06:8983_solr'," +
-        "      'isLive':true," +
-        "      'attributes':[" +
-        "        {'cores':3}," +
-        "        {'freedisk':1688.3182678222656}," +
-        "        {'sysLoadAvg':385.0}," +
-        "        {'node':'solr-06:8983_solr'}]}," +
-        "    {" +
-        "      'node':'solr-02:8983_solr'," +
-        "      'isLive':true," +
-        "      'attributes':[" +
-        "        {'cores':6}," +
-        "        {'freedisk':1778.226963043213}," +
-        "        {'sysLoadAvg':369.0}," +
-        "        {'node':'solr-02:8983_solr'}]}," +
-        "    {" +
-        "      'node':'solr-05:8983_solr'," +
-        "      'isLive':true," +
-        "      'attributes':[" +
-        "        {'cores':3}," +
-        "        {'freedisk':1741.9401931762695}," +
-        "        {'sysLoadAvg':354.0}," +
-        "        {'node':'solr-05:8983_solr'}]}," +
-        "    {" +
-        "      'node':'solr-23:8983_solr'," +
-        "      'isLive':true," +
-        "      'attributes':[" +
-        "        {'cores':3}," +
-        "        {'freedisk':1718.854579925537}," +
-        "        {'sysLoadAvg':329.0}," +
-        "        {'node':'solr-23:8983_solr'}]}," +
-        "    {" +
-        "      'node':'solr-24:8983_solr'," +
-        "      'isLive':true," +
-        "      'attributes':[" +
-        "        {'cores':3}," +
-        "        {'freedisk':1733.6669311523438}," +
-        "        {'sysLoadAvg':327.0}," +
-        "        {'node':'solr-24:8983_solr'}]}," +
-        "    {" +
-        "      'node':'solr-09:8983_solr'," +
-        "      'isLive':true," +
-        "      'attributes':[" +
-        "        {'cores':3}," +
-        "        {'freedisk':1714.6191711425781}," +
-        "        {'sysLoadAvg':278.0}," +
-        "        {'node':'solr-09:8983_solr'}]}," +
-        "    {" +
-        "      'node':'solr-10:8983_solr'," +
-        "      'isLive':true," +
-        "      'attributes':[" +
-        "        {'cores':3}," +
-        "        {'freedisk':1755.3038482666016}," +
-        "        {'sysLoadAvg':266.0}," +
-        "        {'node':'solr-10:8983_solr'}]}," +
-        "    {" +
-        "      'node':'solr-28:8983_solr'," +
-        "      'isLive':false," +
-        "      'attributes':[" +
-        "        {'cores':3}," +
-        "        {'freedisk':1691.3830909729004}," +
-        "        {'sysLoadAvg':261.0}," +
-        "        {'node':'solr-28:8983_solr'}]}," +
-        "    {" +
-        "      'node':'solr-29:8983_solr'," +
-        "      'isLive':true," +
-        "      'attributes':[" +
-        "        {'cores':2}," +
-        "        {'freedisk':1706.797966003418}," +
-        "        {'sysLoadAvg':252.99999999999997}," +
-        "        {'node':'solr-29:8983_solr'}]}," +
-        "    {" +
-        "      'node':'solr-32:8983_solr'," +
-        "      'isLive':true," +
-        "      'attributes':[" +
-        "        {'cores':3}," +
-        "        {'freedisk':1762.432300567627}," +
-        "        {'sysLoadAvg':221.0}," +
-        "        {'node':'solr-32:8983_solr'}]}," +
-        "    {" +
-        "      'node':'solr-21:8983_solr'," +
-        "      'isLive':true," +
-        "      'attributes':[" +
-        "        {'cores':3}," +
-        "        {'freedisk':1760.9801979064941}," +
-        "        {'sysLoadAvg':213.0}," +
-        "        {'node':'solr-21:8983_solr'}]}," +
-        "    {" +
-        "      'node':'solr-22:8983_solr'," +
-        "      'isLive':true," +
-        "      'attributes':[" +
-        "        {'cores':3}," +
-        "        {'freedisk':1780.5297241210938}," +
-        "        {'sysLoadAvg':209.0}," +
-        "        {'node':'solr-22:8983_solr'}]}," +
-        "    {" +
-        "      'node':'solr-31:8983_solr'," +
-        "      'isLive':true," +
-        "      'attributes':[" +
-        "        {'cores':3}," +
-        "        {'freedisk':1700.1481628417969}," +
-        "        {'sysLoadAvg':211.0}," +
-        "        {'node':'solr-31:8983_solr'}]}," +
-        "    {" +
-        "      'node':'solr-33:8983_solr'," +
-        "      'isLive':false," +
-        "      'attributes':[" +
-        "        {'cores':3}," +
-        "        {'freedisk':1748.1132926940918}," +
-        "        {'sysLoadAvg':199.0}," +
-        "        {'node':'solr-33:8983_solr'}]}," +
-        "    {" +
-        "      'node':'solr-36:8983_solr'," +
-        "      'isLive':true," +
-        "      'attributes':[" +
-        "        {'cores':3}," +
-        "        {'freedisk':1776.197639465332}," +
-        "        {'sysLoadAvg':193.0}," +
-        "        {'node':'solr-36:8983_solr'}]}," +
-        "    {" +
-        "      'node':'solr-35:8983_solr'," +
-        "      'isLive':true," +
-        "      'attributes':[" +
-        "        {'cores':3}," +
-        "        {'freedisk':1746.7729606628418}," +
-        "        {'sysLoadAvg':191.0}," +
-        "        {'node':'solr-35:8983_solr'}]}," +
-        "    {" +
-        "      'node':'solr-12:8983_solr'," +
-        "      'isLive':true," +
-        "      'attributes':[" +
-        "        {'cores':3}," +
-        "        {'freedisk':1713.287540435791}," +
-        "        {'sysLoadAvg':175.0}," +
-        "        {'node':'solr-12:8983_solr'}]}," +
-        "    {" +
-        "      'node':'solr-11:8983_solr'," +
-        "      'isLive':true," +
-        "      'attributes':[" +
-        "        {'cores':3}," +
-        "        {'freedisk':1736.784511566162}," +
-        "        {'sysLoadAvg':169.0}," +
-        "        {'node':'solr-11:8983_solr'}]}," +
-        "    {" +
-        "      'node':'solr-35:8983_solr'," +
-        "      'isLive':true," +
-        "      'attributes':[" +
-        "        {'cores':3}," +
-        "        {'freedisk':1766.9416885375977}," +
-        "        {'sysLoadAvg':155.0}," +
-        "        {'node':'solr-35:8983_solr'}]}," +
-        "    {" +
-        "      'node':'solr-17:8983_solr'," +
-        "      'isLive':true," +
-        "      'attributes':[" +
-        "        {'cores':3}," +
-        "        {'freedisk':1764.3425407409668}," +
-        "        {'sysLoadAvg':139.0}," +
-        "        {'node':'solr-17:8983_solr'}]}," +
-        "    {" +
-        "      'node':'solr-18:8983_solr'," +
-        "      'isLive':true," +
-        "      'attributes':[" +
-        "        {'cores':2}," +
-        "        {'freedisk':1757.0613975524902}," +
-        "        {'sysLoadAvg':132.0}," +
-        "        {'node':'solr-18:8983_solr'}]}," +
-        "    {" +
-        "      'node':'solr-20:8983_solr'," +
-        "      'isLive':false," +
-        "      'attributes':[" +
-        "        {'cores':3}," +
-        "        {'freedisk':1747.4205322265625}," +
-        "        {'sysLoadAvg':126.0}," +
-        "        {'node':'solr-20:8983_solr'}]}," +
-        "    {" +
-        "      'node':'solr-27:8983_solr'," +
-        "      'isLive':true," +
-        "      'attributes':[" +
-        "        {'cores':4}," +
-        "        {'freedisk':1721.0442085266113}," +
-        "        {'sysLoadAvg':118.0}," +
-        "        {'node':'solr-27:8983_solr'}]}]}";
 
-    List l = (List) ((Map) Utils.fromJSONString(rowsData)).get("sortedNodes");
+    List l = (List) TestPolicy2.loadFromResource("testSortError.json");
     List<Variable.Type> params = new ArrayList<>();
     params.add(CORES);
     params.add(Variable.Type.FREEDISK);
@@ -3562,11 +3048,6 @@ public class TestPolicy extends SolrTestCaseJ4 {
     Object root = Utils.fromJSONString(writer.toString());
     assertEquals(2l,
         Utils.getObjectByPath(root, true, "violations[0]/violation/replica/NRT"));
-    assertEquals(0l,
-        Utils.getObjectByPath(root, true, "violations[0]/violation/replica/PULL"));
-    assertEquals(0l,
-        Utils.getObjectByPath(root, true, "violations[0]/violation/replica/TLOG"));
-
   }
 
 
@@ -3640,7 +3121,7 @@ public class TestPolicy extends SolrTestCaseJ4 {
     cfg = new AutoScalingConfig((Map<String, Object>) Utils.fromJSONString(autoScalingjson));
     violations = cfg.getPolicy().createSession(cloudManagerWithData((Map) Utils.fromJSONString(dataproviderdata))).getViolations();
     assertEquals(1, violations.size());
-    assertEquals(4, violations.get(0).getViolatingReplicas().size());
+    assertEquals(-4d, violations.get(0).replicaCountDelta, 0.01);
     for (Violation.ReplicaInfoAndErr r : violations.get(0).getViolatingReplicas()) {
       assertEquals(10.0d, r.delta.doubleValue(), 0.1);
     }

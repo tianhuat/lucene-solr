@@ -26,6 +26,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 import java.time.format.DateTimeParseException;
+import java.time.format.ResolverStyle;
 import java.time.temporal.TemporalAccessor;
 import java.time.temporal.TemporalQueries;
 import java.util.Collection;
@@ -51,7 +52,7 @@ import org.slf4j.LoggerFactory;
  * Attempts to mutate selected fields that have only CharSequence-typed values
  * into Date values.  Solr will continue to index date/times in the UTC time
  * zone, but the input date/times may be expressed using other time zones,
- * and will be converted to UTC when they are mutated.
+ * and will be converted to an unambiguous {@link Date} when they are mutated.
  * </p>
  * <p>
  * The default selection behavior is to mutate both those fields that don't match
@@ -67,6 +68,8 @@ import org.slf4j.LoggerFactory;
  * One or more date "format" specifiers must be specified.  See 
  * <a href="https://docs.oracle.com/javase/8/docs/api/java/time/format/DateTimeFormatter.html"
  * >Java 8's DateTimeFormatter javadocs</a> for a description of format strings.
+ * Note that "lenient" and case insensitivity is enabled.
+ * Furthermore, inputs surrounded in single quotes will be removed if found.
  * </p>
  * <p>
  * A default time zone name or offset may optionally be specified for those dates
@@ -78,8 +81,10 @@ import org.slf4j.LoggerFactory;
  * </p>
  * <p>
  * The locale to use when parsing field values using the specified formats may
- * optionally be specified.  If no locale is configured, then {@link Locale#ROOT}
- * will be used. The following configuration specifies the French/France locale and
+ * optionally be specified.  If no locale is configured, then {@code en_US}
+ * will be used since it's implied by some well-known formats.  Recent versions of Java
+ * have become sensitive to this.
+ * The following configuration specifies the French/France locale and
  * two date formats that will parse the strings "le mardi 8 janvier 2013" and 
  * "le 28 déc. 2010 à 15 h 30", respectively.  Note that either individual &lt;str&gt;
  * elements or &lt;arr&gt;-s of &lt;str&gt; elements may be used to specify the
@@ -99,6 +104,11 @@ import org.slf4j.LoggerFactory;
  * <p>
  * See {@link Locale} for a description of acceptable language, country (optional)
  * and variant (optional) values, joined with underscore(s).
+ * </p>
+ *
+ * <p>
+ * Tip: you can use multiple instances of this URP in your chain with different locales or
+ * default time zones if you wish to vary those settings for different format patterns.
  * </p>
  * @since 4.4.0
  */
@@ -120,6 +130,16 @@ public class ParseDateFieldUpdateProcessorFactory extends FieldMutatingUpdatePro
       protected Object mutateValue(Object srcVal) {
         if (srcVal instanceof CharSequence) {
           String srcStringVal = srcVal.toString();
+          // trim single quotes around date if present
+          // see issue #5279  (Apache HttpClient)
+          int stringValLen = srcStringVal.length();
+          if (stringValLen > 1
+              && srcStringVal.startsWith("'")
+              && srcStringVal.endsWith("'")
+          ) {
+            srcStringVal = srcStringVal.substring(1, stringValLen - 1);
+          }
+
           for (Map.Entry<String,DateTimeFormatter> format : formats.entrySet()) {
             DateTimeFormatter parser = format.getValue();
             try {
@@ -143,11 +163,12 @@ public class ParseDateFieldUpdateProcessorFactory extends FieldMutatingUpdatePro
   @Override
   public void init(NamedList args) {
     
-    Locale locale = Locale.ROOT;
-    
+    Locale locale;
     String localeParam = (String)args.remove(LOCALE_PARAM);
     if (null != localeParam) {
       locale = LocaleUtils.toLocale(localeParam);
+    } else {
+      locale = LocaleUtils.toLocale("en_US"); // because well-known patterns assume this
     }
 
     Object defaultTimeZoneParam = args.remove(DEFAULT_TIME_ZONE_PARAM);
@@ -159,8 +180,9 @@ public class ParseDateFieldUpdateProcessorFactory extends FieldMutatingUpdatePro
     Collection<String> formatsParam = args.removeConfigArgs(FORMATS_PARAM);
     if (null != formatsParam) {
       for (String value : formatsParam) {
-        DateTimeFormatter formatter = new DateTimeFormatterBuilder().parseCaseInsensitive()
-            .appendPattern(value).toFormatter(locale).withZone(defaultTimeZone);
+        DateTimeFormatter formatter = new DateTimeFormatterBuilder().parseLenient().parseCaseInsensitive()
+            .appendPattern(value).toFormatter(locale)
+            .withResolverStyle(ResolverStyle.LENIENT).withZone(defaultTimeZone);
         validateFormatter(formatter);
         formats.put(value, formatter);
       }

@@ -31,12 +31,12 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import com.google.common.collect.ImmutableMap;
+import org.apache.solr.client.solrj.cloud.DistribStateManager;
+import org.apache.solr.client.solrj.cloud.SolrCloudManager;
 import org.apache.solr.client.solrj.cloud.autoscaling.AlreadyExistsException;
 import org.apache.solr.client.solrj.cloud.autoscaling.AutoScalingConfig;
 import org.apache.solr.client.solrj.cloud.autoscaling.BadVersionException;
-import org.apache.solr.client.solrj.cloud.DistribStateManager;
 import org.apache.solr.client.solrj.cloud.autoscaling.PolicyHelper;
-import org.apache.solr.client.solrj.cloud.SolrCloudManager;
 import org.apache.solr.client.solrj.cloud.autoscaling.VersionedData;
 import org.apache.solr.cloud.rule.ReplicaAssigner;
 import org.apache.solr.cloud.rule.Rule;
@@ -250,7 +250,7 @@ public class Assign {
                                                     List<String> shardNames,
                                                     int numNrtReplicas,
                                                     int numTlogReplicas,
-                                                    int numPullReplicas) throws IOException, InterruptedException {
+                                                    int numPullReplicas) throws IOException, InterruptedException, AssignmentException {
     List<Map> rulesMap = (List) message.get("rule");
     String policyName = message.getStr(POLICY);
     AutoScalingConfig autoScalingConfig = cloudManager.getDistribStateManager().getAutoScalingConfig();
@@ -273,7 +273,7 @@ public class Assign {
     } else {
       if (numTlogReplicas + numPullReplicas != 0 && rulesMap != null) {
         throw new SolrException(SolrException.ErrorCode.BAD_REQUEST,
-            Replica.Type.TLOG + " or " + Replica.Type.PULL + " replica types not supported with placement rules or cluster policies");
+            Replica.Type.TLOG + " or " + Replica.Type.PULL + " replica types not supported with placement rules");
       }
     }
 
@@ -322,11 +322,11 @@ public class Assign {
   // Gets a list of candidate nodes to put the required replica(s) on. Throws errors if not enough replicas
   // could be created on live nodes given maxShardsPerNode, Replication factor (if from createShard) etc.
   public static List<ReplicaCount> getNodesForNewReplicas(ClusterState clusterState, String collectionName,
-                                                          String shard, int nrtReplicas,
-                                                          Object createNodeSet, SolrCloudManager cloudManager) throws IOException, InterruptedException {
-    log.debug("getNodesForNewReplicas() shard: {} , replicas : {} , createNodeSet {}", shard, nrtReplicas, createNodeSet );
+                                                          String shard, int nrtReplicas, int tlogReplicas, int pullReplicas,
+                                                          Object createNodeSet, SolrCloudManager cloudManager) throws IOException, InterruptedException, AssignmentException {
+    log.debug("getNodesForNewReplicas() shard: {} , nrtReplicas : {} , tlogReplicas: {} , pullReplicas: {} , createNodeSet {}", shard, nrtReplicas, tlogReplicas, pullReplicas, createNodeSet );
     DocCollection coll = clusterState.getCollection(collectionName);
-    Integer maxShardsPerNode = coll.getMaxShardsPerNode();
+    Integer maxShardsPerNode = coll.getMaxShardsPerNode() == -1 ? Integer.MAX_VALUE : coll.getMaxShardsPerNode();
     List<String> createNodeList = null;
 
     if (createNodeSet instanceof List) {
@@ -338,15 +338,15 @@ public class Assign {
      HashMap<String, ReplicaCount> nodeNameVsShardCount = getNodeNameVsShardCount(collectionName, clusterState, createNodeList);
 
     if (createNodeList == null) { // We only care if we haven't been told to put new replicas on specific nodes.
-      int availableSlots = 0;
+      long availableSlots = 0;
       for (Map.Entry<String, ReplicaCount> ent : nodeNameVsShardCount.entrySet()) {
         //ADDREPLICA can put more than maxShardsPerNode on an instance, so this test is necessary.
         if (maxShardsPerNode > ent.getValue().thisCollectionNodes) {
           availableSlots += (maxShardsPerNode - ent.getValue().thisCollectionNodes);
         }
       }
-      if (availableSlots < nrtReplicas) {
-        throw new SolrException(SolrException.ErrorCode.BAD_REQUEST,
+      if (availableSlots < nrtReplicas + tlogReplicas + pullReplicas) {
+        throw new AssignmentException(
             String.format(Locale.ROOT, "Cannot create %d new replicas for collection %s given the current number of live nodes and a maxShardsPerNode of %d",
                 nrtReplicas, collectionName, maxShardsPerNode));
       }
@@ -355,13 +355,17 @@ public class Assign {
     List l = (List) coll.get(DocCollection.RULE);
     List<ReplicaPosition> replicaPositions = null;
     if (l != null) {
+      if (tlogReplicas + pullReplicas > 0)  {
+        throw new AssignmentException(Replica.Type.TLOG + " or " + Replica.Type.PULL +
+            " replica types not supported with placement rules");
+      }
       // TODO: make it so that this method doesn't require access to CC
       replicaPositions = getNodesViaRules(clusterState, shard, nrtReplicas, cloudManager, coll, createNodeList, l);
     }
     String policyName = coll.getStr(POLICY);
     AutoScalingConfig autoScalingConfig = cloudManager.getDistribStateManager().getAutoScalingConfig();
     if (policyName != null || !autoScalingConfig.getPolicy().getClusterPolicy().isEmpty()) {
-      replicaPositions = Assign.getPositionsUsingPolicy(collectionName, Collections.singletonList(shard), nrtReplicas, 0, 0,
+      replicaPositions = Assign.getPositionsUsingPolicy(collectionName, Collections.singletonList(shard), nrtReplicas, tlogReplicas, pullReplicas,
           policyName, cloudManager, createNodeList);
     }
 
@@ -384,7 +388,7 @@ public class Assign {
                                                               int tlogReplicas,
                                                               int pullReplicas,
                                                               String policyName, SolrCloudManager cloudManager,
-                                                              List<String> nodesList) throws IOException, InterruptedException {
+                                                              List<String> nodesList) throws IOException, InterruptedException, AssignmentException {
     log.debug("shardnames {} NRT {} TLOG {} PULL {} , policy {}, nodeList {}", shardNames, nrtReplicas, tlogReplicas, pullReplicas, policyName, nodesList);
     List<ReplicaPosition> replicaPositions = null;
     AutoScalingConfig autoScalingConfig = cloudManager.getDistribStateManager().getAutoScalingConfig();
@@ -402,7 +406,7 @@ public class Assign {
           nodesList);
       return replicaPositions;
     } catch (Exception e) {
-      throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Error getting replica locations", e);
+      throw new AssignmentException("Error getting replica locations : " + e.getMessage(), e);
     } finally {
       if (log.isTraceEnabled()) {
         if (replicaPositions != null)
@@ -461,7 +465,7 @@ public class Assign {
       return nodeNameVsShardCount;
     }
     DocCollection coll = clusterState.getCollection(collectionName);
-    Integer maxShardsPerNode = coll.getMaxShardsPerNode();
+    int maxShardsPerNode = coll.getMaxShardsPerNode() == -1 ? Integer.MAX_VALUE : coll.getMaxShardsPerNode();
     Map<String, DocCollection> collections = clusterState.getCollectionsMap();
     for (Map.Entry<String, DocCollection> entry : collections.entrySet()) {
       DocCollection c = entry.getValue();
@@ -484,5 +488,27 @@ public class Assign {
     return nodeNameVsShardCount;
   }
 
+  /**
+   * Thrown if there is an exception while assigning nodes for replicas
+   */
+  public static class AssignmentException extends RuntimeException {
+    public AssignmentException() {
+    }
 
+    public AssignmentException(String message) {
+      super(message);
+    }
+
+    public AssignmentException(String message, Throwable cause) {
+      super(message, cause);
+    }
+
+    public AssignmentException(Throwable cause) {
+      super(cause);
+    }
+
+    public AssignmentException(String message, Throwable cause, boolean enableSuppression, boolean writableStackTrace) {
+      super(message, cause, enableSuppression, writableStackTrace);
+    }
+  }
 }
