@@ -31,6 +31,10 @@ solrAdminApp.config([
         templateUrl: 'partials/index.html',
         controller: 'IndexController'
       }).
+      when('/login', {
+        templateUrl: 'partials/login.html',
+        controller: 'LoginController'
+      }).
       when('/~logging', {
         templateUrl: 'partials/logging.html',
         controller: 'LoggingController'
@@ -369,56 +373,73 @@ solrAdminApp.config([
 
   return {request: started, response: ended, responseError: failed};
 })
-.factory('authInterceptor', function($q, $rootScope, $timeout, $injector) {
-  var started = function(config) {
-    var ah = "Basic c29scjpTb2xyUm9ja3M=";  // solr / SolrRocks
-    config.headers['Authorization'] = ah;
-    console.log("Added authorization header " + ah);
-    return config || $q.when(config);
-  };
-
-  var ended = function(response) {
-    console.log("Response headers: " + JSON.stringify(response.headers, undefined, 2));
-    if (response.headers['WWW-Authenticate'] != null) {
-      console.log("Got WWW-Authenticate header: " + response.headers['WWW-Authenticate']);
-    }
-    return response || $q.when(response);
-  };
-
-  var failed = function(rejection) {
-    console.log("Failed with rejection " + JSON.stringify(rejection, undefined, 2));
-    if (rejection.status === 401) {
-      console.log("Status code is 401");
-    } else {
-      console.log("Rejection status is " + rejection.status)
-    }
-    $rootScope.$broadcast('loadingStatusInactive');
-    return $q.reject(rejection);
-  };
-
-  return {request: started, response: ended, responseError: failed};
-})
+// NOCOMMIT First iteration    
+// .factory('authInterceptor', function($q, $rootScope, $timeout, $injector) {
+//   var started = function(config) {
+//     var ah = "Basic c29scjpyb2Nrcw==";  // solr / SolrRocks
+//     config.headers['Authorization'] = ah;
+//     console.log("Added authorization header " + ah);
+//     return config || $q.when(config);
+//   };
+//
+//   var ended = function(response) {
+//     console.log("Response headers: " + JSON.stringify(response.headers, undefined, 2));
+//     if (response.headers['WWW-Authenticate'] != null) {
+//       console.log("Got WWW-Authenticate header: " + response.headers['WWW-Authenticate']);
+//     }
+//     return response || $q.when(response);
+//   };
+//
+//   var failed = function(rejection) {
+//     console.log("Failed with rejection " + JSON.stringify(rejection, undefined, 2));
+//     if (rejection.status === 401) {
+//       console.log("Status code is 401");
+//     } else {
+//       console.log("Rejection status is " + rejection.status)
+//     }
+//     $rootScope.$broadcast('loadingStatusInactive');
+//     return $q.reject(rejection);
+//   };
+//
+//   return {request: started, response: ended, responseError: failed};
+// })
 .config(function($httpProvider) {
   $httpProvider.interceptors.push("httpInterceptor");
-  $httpProvider.interceptors.push("authInterceptor");
+  // NOCOMMIT $httpProvider.interceptors.push("authInterceptor");
   // Tell the BasicAuth plugin that we are Admin UI so it can serve us a 'Authorization: xBasic xxxx' header
   // so that the browser will not interfer with the login dialogue
   $httpProvider.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
 })
-.directive('fileModel', function ($parse) {
-    return {
-        restrict: 'A',
-        link: function(scope, element, attrs) {
-            var model = $parse(attrs.fileModel);
-            var modelSetter = model.assign;
+// NOCOMMIT: just for testing     
+.run(['$rootScope', '$location', '$cookieStore', '$http',
+  function ($rootScope, $location, $cookieStore, $http) {
+    // keep user logged in after page refresh
+    $rootScope.globals = $cookieStore.get('globals') || {};
+    if ($rootScope.globals.currentUser) {
+      $http.defaults.headers.common['Authorization'] = 'Basic ' + $rootScope.globals.currentUser.authdata; // jshint ignore:line
+    }
 
-            element.bind('change', function(){
-                scope.$apply(function(){
-                    modelSetter(scope, element[0].files[0]);
-                });
-            });
-        }
-    };
+    $rootScope.$on('$locationChangeStart', function (event, next, current) {
+      // redirect to login page if not logged in
+      if ($location.path() !== '/login' && !$rootScope.globals.currentUser) {
+        $location.path('/login');
+      }
+    });
+  }])
+.directive('fileModel', function ($parse) {
+  return {
+    restrict: 'A',
+    link: function(scope, element, attrs) {
+      var model = $parse(attrs.fileModel);
+      var modelSetter = model.assign;
+
+      element.bind('change', function(){
+        scope.$apply(function(){
+          modelSetter(scope, element[0].files[0]);
+        });
+      });
+    }
+  };
 });
 
 solrAdminApp.controller('MainController', function($scope, $route, $rootScope, $location, Cores, Collections, System, Ping, Constants) {
@@ -432,7 +453,7 @@ solrAdminApp.controller('MainController', function($scope, $route, $rootScope, $
   $scope.refresh = function() {
       $scope.cores = [];
       $scope.collections = [];
-  }
+  };
 
   $scope.refresh();
   $scope.resetMenu = function(page, pageType) {
@@ -462,7 +483,7 @@ solrAdminApp.controller('MainController', function($scope, $route, $rootScope, $
           for (key in data.collections) {
             var collection = {name: data.collections[key]};
             $scope.collections.push(collection);
-            if (pageType == Constants.IS_COLLECTION_PAGE && collection.name == currentCollectionName) {
+            if (pageType === Constants.IS_COLLECTION_PAGE && collection.name === currentCollectionName) {
               $scope.currentCollection = collection;
             }
           }
@@ -486,15 +507,15 @@ solrAdminApp.controller('MainController', function($scope, $route, $rootScope, $
 
   $scope.dumpCloud = function() {
       $scope.$broadcast("cloud-dump");
-  }
+  };
 
   $scope.showCore = function(core) {
     $location.url("/" + core.name);
-  }
+  };
 
   $scope.showCollection = function(collection) {
     $location.url("/" + collection.name + "/collection-overview")
-  }
+  };
 
   $scope.$on('$routeChangeStart', function() {
       $rootScope.exceptions = {};

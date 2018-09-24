@@ -23,6 +23,7 @@ limitations under the License.
   <link rel="icon" type="image/x-icon" href="img/favicon.ico?_=${version}">
   <link rel="shortcut icon" type="image/x-icon" href="img/favicon.ico?_=${version}">
 
+  <link rel="stylesheet" type="text/css" href="css/bootstrap-3.3/bootstrap.min.css?_=${version}">
   <link rel="stylesheet" type="text/css" href="css/angular/common.css?_=${version}">
   <link rel="stylesheet" type="text/css" href="css/angular/analysis.css?_=${version}">
   <link rel="stylesheet" type="text/css" href="css/angular/cloud.css?_=${version}">
@@ -67,6 +68,7 @@ limitations under the License.
   <script src="js/angular/http-auth-interceptor.js"></script>
   <script src="js/angular/login-controllers.js"></script>
   <script src="js/angular/controllers/index.js"></script>
+  <script src="js/angular/controllers/login.js"></script>
   <script src="js/angular/controllers/logging.js"></script>
   <script src="js/angular/controllers/cloud.js"></script>
   <script src="js/angular/controllers/collections.js"></script>
@@ -142,7 +144,8 @@ limitations under the License.
         <div>
 
           <ul id="menu">
-
+            <li id="login" class="global" ng-class="{active:page=='login'}"><p><a href="#/login">Logout</a></p></li>
+            
             <li id="index" class="global" ng-class="{active:page=='index'}"><p><a href="#/">Dashboard</a></p></li>
 
             <li id="logging" class="global" ng-class="{active:page=='logging'}"><p><a href="#/~logging">Logging</a></p>
