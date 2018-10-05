@@ -30,6 +30,7 @@ import java.net.URL;
 import java.net.URLDecoder;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -44,6 +45,7 @@ import java.util.TreeSet;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -53,7 +55,9 @@ import org.apache.solr.client.solrj.cloud.DistribStateManager;
 import org.apache.solr.client.solrj.cloud.autoscaling.VersionedData;
 import org.apache.solr.client.solrj.impl.BinaryRequestWriter;
 import org.apache.solr.common.IteratorWriter;
+import org.apache.solr.common.LinkedHashMapWriter;
 import org.apache.solr.common.MapWriter;
+import org.apache.solr.common.MapWriterMap;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SpecProvider;
 import org.apache.solr.common.cloud.SolrZkClient;
@@ -104,7 +108,16 @@ public class Utils {
   }
 
   public static void forEachMapEntry(MapWriter mw, String path, BiConsumer fun) {
-    Object o = path == null ? mw : Utils.getObjectByPath(mw, false, path);
+    Object o = Utils.getObjectByPath(mw, false, path);
+    forEachMapEntry(o, fun);
+  }
+
+  public static void forEachMapEntry(MapWriter mw, List<String> path, BiConsumer fun) {
+    Object o = Utils.getObjectByPath(mw, false, path);
+    forEachMapEntry(o, fun);
+  }
+
+  public static void forEachMapEntry(Object o, BiConsumer fun) {
     if (o instanceof MapWriter) {
       MapWriter m = (MapWriter) o;
       try {
@@ -229,7 +242,7 @@ public class Utils {
         JSONParser.ALLOW_MISSING_COLON_COMMA_BEFORE_OBJECT |
         JSONParser.OPTIONAL_OUTER_BRACES);
     try {
-      return ObjectBuilder.getVal(parser);
+      return STANDARDOBJBUILDER.apply(parser).getVal(parser);
     } catch (IOException e) {
       throw new RuntimeException(e); // should never happen w/o using real IO
     }
@@ -254,7 +267,35 @@ public class Utils {
 
   public static Object fromJSON(InputStream is){
     try {
-      return new ObjectBuilder(getJSONParser((new InputStreamReader(is, StandardCharsets.UTF_8)))).getVal();
+      return STANDARDOBJBUILDER.apply(getJSONParser((new InputStreamReader(is, StandardCharsets.UTF_8)))).getVal();
+    } catch (IOException e) {
+      throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Parse error", e);
+    }
+  }
+
+  public static final Function<JSONParser, ObjectBuilder> STANDARDOBJBUILDER = jsonParser -> {
+    try {
+      return new ObjectBuilder(jsonParser);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  };
+  public static final Function<JSONParser, ObjectBuilder> MAPWRITEROBJBUILDER = jsonParser -> {
+    try {
+      return new ObjectBuilder(jsonParser){
+        @Override
+        public Object newObject() {
+          return new LinkedHashMapWriter();
+        }
+      };
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  };
+
+  public static Object fromJSON(InputStream is, Function<JSONParser, ObjectBuilder> objBuilderProvider) {
+    try {
+      return objBuilderProvider.apply(getJSONParser((new InputStreamReader(is, StandardCharsets.UTF_8)))).getVal();
     } catch (IOException e) {
       throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Parse error", e);
     }
@@ -282,7 +323,7 @@ public class Utils {
 
   public static Object fromJSONString(String json)  {
     try {
-      return new ObjectBuilder(getJSONParser(new StringReader(json))).getVal();
+      return STANDARDOBJBUILDER.apply(getJSONParser(new StringReader(json))).getVal();
     } catch (IOException e) {
       throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Parse error", e);
     }
@@ -365,7 +406,7 @@ public class Utils {
     for (int i = 0; i < hierarchy.size(); i++) {
       int idx = -1;
       String s = hierarchy.get(i);
-      if (s.endsWith("]")) {
+      if (s != null && s.endsWith("]")) {
         Matcher matcher = ARRAY_ELEMENT_INDEX.matcher(s);
         if (matcher.find()) {
           s = matcher.group(1);
@@ -376,8 +417,14 @@ public class Utils {
         Object o = getVal(obj, s, -1);
         if (o == null) return null;
         if (idx > -1) {
-          List l = (List) o;
-          o = idx < l.size() ? l.get(idx) : null;
+          if (o instanceof MapWriter) {
+            o = getVal(o, null, idx);
+          } else if (o instanceof Map) {
+            o = getVal(new MapWriterMap((Map) o), null, idx);
+          } else {
+            List l = (List) o;
+            o = idx < l.size() ? l.get(idx) : null;
+          }
         }
         if (!isMapLike(o)) return null;
         obj = o;
@@ -385,10 +432,7 @@ public class Utils {
         Object val = getVal(obj, s, -1);
         if (val == null) return null;
         if (idx > -1) {
-          if (val instanceof MapWriter) {
-            val = getVal((MapWriter) val, null, idx);
-
-          } else if (val instanceof IteratorWriter) {
+          if (val instanceof IteratorWriter) {
             val = getValueAt((IteratorWriter) val, idx);
           } else {
             List l = (List) val;
@@ -427,6 +471,19 @@ public class Utils {
 
   }
 
+  static class MapWriterEntry<V> extends AbstractMap.SimpleEntry<String, V> implements MapWriter, Map.Entry<String, V> {
+    MapWriterEntry(String key, V value) {
+      super(key, value);
+    }
+
+    @Override
+    public void writeMap(EntryWriter ew) throws IOException {
+      ew.put("key", getKey());
+      ew.put("value", getValue());
+    }
+
+  }
+
   private static boolean isMapLike(Object o) {
     return o instanceof Map || o instanceof NamedList || o instanceof MapWriter;
   }
@@ -440,10 +497,10 @@ public class Utils {
           @Override
           public MapWriter.EntryWriter put(String k, Object v) {
             if (result[0] != null) return this;
-            if (k != null) {
-              if (key.equals(k)) result[0] = v;
+            if (idx < 0) {
+              if (k.equals(key)) result[0] = v;
             } else {
-              if (++count == idx) result[0] = v;
+              if (++count == idx) result[0] = new MapWriterEntry(k, v);
             }
             return this;
           }
@@ -631,4 +688,5 @@ public class Utils {
     }
     return def;
   }
+
 }
