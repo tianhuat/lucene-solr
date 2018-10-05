@@ -15,12 +15,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 <div id="login">
-  <div class="col-xs-offset-2 col-xs-8">
-    <h1>Please log in</h1>
-    Basic Authentication 
+
+  <div class="col-xs-offset-2 col-xs-8" ng-show="authType === 'Basic'">
+    <h1>Basic Authentication</h1>     
     
+    <p>Type: {{authType}}</p>
+    <p>WWW-Header: {{wwwAuthHeader}}</p>
+    <p>Config: {{authConfig}}</p>
+    <p>Redirect: {{authLocation}}</p>
+    <p>LoggedinUser: {{authLoggedinUser}}</p>
+
     <div ng-show="error" class="alert alert-danger">{{error}}</div>
-    <form name="form" ng-submit="login()" role="form">
+    <form name="form" ng-submit="login()" role="form" ng-show="!isLoggedIn()">
         <div class="form-group">
             <label for="username">Username</label>
             <i class="fa fa-key"></i>
@@ -38,5 +44,24 @@ limitations under the License.
             <img ng-if="dataLoading" src="data:image/gif;base64,R0lGODlhEAAQAPIAAP///wAAAMLCwkJCQgAAAGJiYoKCgpKSkiH/C05FVFNDQVBFMi4wAwEAAAAh/hpDcmVhdGVkIHdpdGggYWpheGxvYWQuaW5mbwAh+QQJCgAAACwAAAAAEAAQAAADMwi63P4wyklrE2MIOggZnAdOmGYJRbExwroUmcG2LmDEwnHQLVsYOd2mBzkYDAdKa+dIAAAh+QQJCgAAACwAAAAAEAAQAAADNAi63P5OjCEgG4QMu7DmikRxQlFUYDEZIGBMRVsaqHwctXXf7WEYB4Ag1xjihkMZsiUkKhIAIfkECQoAAAAsAAAAABAAEAAAAzYIujIjK8pByJDMlFYvBoVjHA70GU7xSUJhmKtwHPAKzLO9HMaoKwJZ7Rf8AYPDDzKpZBqfvwQAIfkECQoAAAAsAAAAABAAEAAAAzMIumIlK8oyhpHsnFZfhYumCYUhDAQxRIdhHBGqRoKw0R8DYlJd8z0fMDgsGo/IpHI5TAAAIfkECQoAAAAsAAAAABAAEAAAAzIIunInK0rnZBTwGPNMgQwmdsNgXGJUlIWEuR5oWUIpz8pAEAMe6TwfwyYsGo/IpFKSAAAh+QQJCgAAACwAAAAAEAAQAAADMwi6IMKQORfjdOe82p4wGccc4CEuQradylesojEMBgsUc2G7sDX3lQGBMLAJibufbSlKAAAh+QQJCgAAACwAAAAAEAAQAAADMgi63P7wCRHZnFVdmgHu2nFwlWCI3WGc3TSWhUFGxTAUkGCbtgENBMJAEJsxgMLWzpEAACH5BAkKAAAALAAAAAAQABAAAAMyCLrc/jDKSatlQtScKdceCAjDII7HcQ4EMTCpyrCuUBjCYRgHVtqlAiB1YhiCnlsRkAAAOwAAAAAAAAAAAA==" />
         </div>
     </form>
+    <form name="logoutForm" ng-submit="logout()" role="form" ng-show="isLoggedIn()">
+        <div class="form-actions">
+            <button type="submit" class="btn btn-danger">Logout</button>
+        </div>
+    </form>
+    
+  </div>
+  
+  
+  <div class="col-xs-offset-2 col-xs-8" ng-show="authType === 'unknown'">
+    <h1>Authentication type not supported</h1>     
+    
+    <p>Type: {{authType}}</p>
+    <p>WWW-Header: {{wwwAuthHeader}}</p>
+    <p>Config: {{authConfig}}</p>
+    <p>Redirect: {{authLocation}}</p>
+    <p>LoggedinUser: {{authLoggedinUser}}</p>
+
+    You cannot use Solr's Admin UI for this operation. Please use another client that supports this type. 
   </div>
 </div>

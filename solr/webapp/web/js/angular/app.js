@@ -369,66 +369,85 @@ solrAdminApp.config([
       $rootScope.exceptions[rejection.config.url] = rejection.data.error;
     }
     return $q.reject(rejection);
-  }
+  };
 
   return {request: started, response: ended, responseError: failed};
 })
 // NOCOMMIT First iteration    
-// .factory('authInterceptor', function($q, $rootScope, $timeout, $injector) {
-//   var started = function(config) {
-//     var ah = "Basic c29scjpyb2Nrcw==";  // solr / SolrRocks
-//     config.headers['Authorization'] = ah;
-//     console.log("Added authorization header " + ah);
-//     return config || $q.when(config);
-//   };
-//
-//   var ended = function(response) {
-//     console.log("Response headers: " + JSON.stringify(response.headers, undefined, 2));
-//     if (response.headers['WWW-Authenticate'] != null) {
-//       console.log("Got WWW-Authenticate header: " + response.headers['WWW-Authenticate']);
-//     }
-//     return response || $q.when(response);
-//   };
-//
-//   var failed = function(rejection) {
-//     console.log("Failed with rejection " + JSON.stringify(rejection, undefined, 2));
-//     if (rejection.status === 401) {
-//       console.log("Status code is 401");
-//     } else {
-//       console.log("Rejection status is " + rejection.status)
-//     }
-//     $rootScope.$broadcast('loadingStatusInactive');
-//     return $q.reject(rejection);
-//   };
-//
-//   return {request: started, response: ended, responseError: failed};
-// })
+.factory('authInterceptor', function($q, $rootScope, $location, $timeout, $injector) {
+  var started = function(config) {
+    console.log("Request config: " + JSON.stringify(config, undefined, 2));
+    // var ah = "Basic c29scjpyb2Nrcw==";  // solr / SolrRocks
+    // config.headers['Authorization'] = ah;
+    // console.log("Added authorization header " + ah);
+    if (sessionStorage.getItem("auth.header") !== null) {
+      if (config.headers['Authorization'] === null) {
+        config.headers['Authorization'] = sessionStorage.getItem("auth.header");
+        console.log("We have a logged in user with header " + sessionStorage.getItem("auth.username") + ", appending header");
+      }
+    }
+    return config || $q.when(config);
+  };
+
+  var ended = function(response) {
+    console.log("Response headers: " + JSON.stringify(response.headers(), undefined, 2));
+    return response || $q.when(response);
+  };
+
+  var failed = function(rejection) {
+    console.log("Failed with rejection " + JSON.stringify(rejection, undefined, 2));
+    if (rejection.status === 401) {
+      console.log("Status code is 401");
+      var headers = rejection.headers();
+      console.log("Headers are " + JSON.stringify(headers, undefined, 2));
+      var wwwAuthHeader = headers['www-authenticate'];
+      sessionStorage.setItem("auth.wwwAuthHeader", wwwAuthHeader);
+      var authDataHeader = headers['X-Solr-AuthData'];
+      if (authDataHeader !== null) {
+        sessionStorage.setItem("auth.config", authDataHeader);
+      }
+      console.log("Got WWW-Authenticate header: " + wwwAuthHeader + " and X-Solr-AuthData: " + authDataHeader);
+      var authType = wwwAuthHeader.split(" ")[0];
+      console.log("AuthType is: " + authType);
+      sessionStorage.setItem("auth.type", authType);
+      sessionStorage.setItem("auth.location", $location.path());
+      sessionStorage.removeItem("auth.username");
+      sessionStorage.removeItem("auth.header");
+      $location.path('/login');
+    } else {
+      console.log("Rejection status is " + rejection.status)
+    }
+    $rootScope.$broadcast('loadingStatusInactive');
+    return $q.reject(rejection);
+  };
+
+  return {request: started, response: ended, responseError: failed};
+})
 .config(function($httpProvider) {
   $httpProvider.interceptors.push("httpInterceptor");
-  // NOCOMMIT $httpProvider.interceptors.push("authInterceptor");
-  // Tell the BasicAuth plugin that we are Admin UI so it can serve us a 'Authorization: xBasic xxxx' header
-  // so that the browser will not interfer with the login dialogue
+  $httpProvider.interceptors.push("authInterceptor");
+  // Force BasicAuth plugin to serve us a 'Authorization: xBasic xxxx' header so browser will not pop up login dialogue
   $httpProvider.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
 })
     
     
 // NOCOMMIT: just for testing     
-.run(['$rootScope', '$location', '$cookieStore', '$http',
-  function ($rootScope, $location, $cookieStore, $http) {
-    // keep user logged in after page refresh
-    // Replace with interceptor
-    $rootScope.globals = $cookieStore.get('globals') || {};
-    if ($rootScope.globals.currentUser) {
-      $http.defaults.headers.common['Authorization'] = 'Basic ' + $rootScope.globals.currentUser.authdata; // jshint ignore:line
-    }
-
-    $rootScope.$on('$locationChangeStart', function (event, next, current) {
-      // redirect to login page if not logged in
-      if ($location.path() !== '/login' && !$rootScope.globals.currentUser) {
-        $location.path('/login');
-      }
-    });
-  }])
+// .run(['$rootScope', '$location', '$cookieStore', '$http',
+//   function ($rootScope, $location, $cookieStore, $http) {
+//     // keep user logged in after page refresh
+//     // Replace with interceptor
+//     $rootScope.globals = $cookieStore.get('globals') || {};
+//     if ($rootScope.globals.currentUser) {
+//       $http.defaults.headers.common['Authorization'] = 'Basic ' + $rootScope.globals.currentUser.authdata; // jshint ignore:line
+//     }
+//
+//     // $rootScope.$on('$locationChangeStart', function (event, next, current) {
+//     //   // redirect to login page if not logged in
+//     //   if ($location.path() !== '/login' && !$rootScope.globals.currentUser) {
+//     //     $location.path('/login');
+//     //   }
+//     // });
+//   }])
 
     
 .directive('fileModel', function ($parse) {

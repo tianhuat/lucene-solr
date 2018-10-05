@@ -108,6 +108,12 @@ public class BasicAuthPlugin extends AuthenticationPlugin implements ConfigEdita
       }
       response.setHeader(entry.getKey(), value);
     }
+    // NOCOMMIT - which headers to set?
+    // Need to explicitly allow Admin UI to read these headers from the 401 response
+//    response.setHeader("Access-Control-Expose-Headers", "WWW-Authenticate, X-Solr-AuthData");
+//    response.setHeader("Access-Control-Allow-Origin", "*");
+//    response.setHeader("Access-Control-Allow-Methods", "POST, GET, PUT, DELETE");
+//    response.setHeader("Access-Control-Max-Age", "3600");
     response.sendError(401, message);
   }
 

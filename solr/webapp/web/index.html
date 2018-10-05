@@ -64,9 +64,6 @@ limitations under the License.
   <script src="libs/jquery-ui.min.js"></script>
   <script src="js/angular/app.js"></script>
   <script src="js/angular/services.js"></script>
-  <script src="js/angular/directives.js"></script>
-  <script src="js/angular/http-auth-interceptor.js"></script>
-  <script src="js/angular/login-controllers.js"></script>
   <script src="js/angular/controllers/index.js"></script>
   <script src="js/angular/controllers/login.js"></script>
   <script src="js/angular/controllers/logging.js"></script>
@@ -144,7 +141,7 @@ limitations under the License.
         <div>
 
           <ul id="menu">
-            <li id="login" class="global" ng-class="{active:page=='login'}"><p><a href="#/login">Logout</a></p></li>
+            <li id="login" class="global" ng-class="{active:page=='login'}"><p><a href="#/login">Logout {{username}}</a></p></li>
             
             <li id="index" class="global" ng-class="{active:page=='index'}"><p><a href="#/">Dashboard</a></p></li>
 

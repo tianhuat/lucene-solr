@@ -264,8 +264,8 @@ solrAdminServices.factory('System',
      })
 }])
 .factory('AuthenticationService',
-    ['Base64', '$http', '$cookieStore', '$rootScope', '$timeout',
-      function (Base64, $http, $cookieStore, $rootScope, $timeout) {
+    ['Base64', '$http', '$rootScope', '$timeout',
+      function (Base64, $http, $rootScope, $timeout) {
         var service = {};
 
         service.Login = function (username, password, callback) {
@@ -293,6 +293,9 @@ solrAdminServices.factory('System',
         service.SetCredentials = function (username, password) {
           var authdata = Base64.encode(username + ':' + password);
 
+          sessionStorage.setItem("auth.username", username);
+          $rootScope.username = username;
+
           $rootScope.globals = {
             currentUser: {
               username: username,
@@ -300,14 +303,21 @@ solrAdminServices.factory('System',
             }
           };
 
-          $http.defaults.headers.common['Authorization'] = 'Basic ' + authdata; // jshint ignore:line
-          $cookieStore.put('globals', $rootScope.globals);
+          // $http.defaults.headers.common['Authorization'] = 'Basic ' + authdata; // jshint ignore:line
+          $http.defaults.headers.common.Authorization = 'Basic ' + authdata;
+          // sessionStorage.setItem('globals', $rootScope.globals);
+          sessionStorage.setItem("auth.header", authdata);
+          console.log("Stored auth data on session storage");
         };
 
         service.ClearCredentials = function () {
           $rootScope.globals = {};
-          $cookieStore.remove('globals');
-          $http.defaults.headers.common.Authorization = 'Basic ';
+          // sessionStorage.removeItem('globals');
+          sessionStorage.removeItem("auth.header");
+          sessionStorage.removeItem("auth.username");
+          sessionStorage.removeItem("auth.wwwAuthHeader");
+          $http.defaults.headers.common.Authorization = null;
+          console.log("Cleared stored auth data");
         };
 
         return service;
