@@ -14,16 +14,18 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 -->
-<div id="login">
+<div id="login" class="clearfix">
 
-  <div class="col-xs-offset-2 col-xs-8" ng-show="authType === 'Basic'">
+  <div ng-show="authScheme === 'Basic'">
     <h1>Basic Authentication</h1>     
     
-    <p>Type: {{authType}}</p>
+    <p>Scheme: {{authScheme}}</p>
+    <p>Realm: {{authRealm}}</p>
     <p>WWW-Header: {{wwwAuthHeader}}</p>
     <p>Config: {{authConfig}}</p>
     <p>Redirect: {{authLocation}}</p>
     <p>LoggedinUser: {{authLoggedinUser}}</p>
+    <p>AuthHeader: {{authHeader}}</p>
 
     <div ng-show="error" class="alert alert-danger">{{error}}</div>
     <form name="form" ng-submit="login()" role="form" ng-show="!isLoggedIn()">
@@ -53,10 +55,10 @@ limitations under the License.
   </div>
   
   
-  <div class="col-xs-offset-2 col-xs-8" ng-show="authType === 'unknown'">
+  <div ng-show="authScheme === 'unknown'">
     <h1>Authentication type not supported</h1>     
     
-    <p>Type: {{authType}}</p>
+    <p>Type: {{authScheme}}</p>
     <p>WWW-Header: {{wwwAuthHeader}}</p>
     <p>Config: {{authConfig}}</p>
     <p>Redirect: {{authLocation}}</p>

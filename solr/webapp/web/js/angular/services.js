@@ -301,9 +301,9 @@ solrAdminServices.factory('System',
           // };
           //
           sessionStorage.setItem('globals', $rootScope.globals);
-          sessionStorage.setItem("auth.header", authdata);
+          sessionStorage.setItem("auth.header", "Basic " + authdata);
           sessionStorage.setItem("auth.username", username);
-          // $http.defaults.headers.common.Authorization = authdata;
+          // $http.defaults.headers.common.Authorization = "Basic " + authdata;
           console.log("Stored auth data on session storage");
         };
 
@@ -311,6 +311,8 @@ solrAdminServices.factory('System',
           $rootScope.globals = {};
           sessionStorage.removeItem('globals');
           sessionStorage.removeItem("auth.header");
+          sessionStorage.removeItem("auth.scheme");
+          sessionStorage.removeItem("auth.realm");
           sessionStorage.removeItem("auth.username");
           sessionStorage.removeItem("auth.wwwAuthHeader");
           // $http.defaults.headers.common.Authorization = null;

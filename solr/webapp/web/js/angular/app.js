@@ -373,51 +373,41 @@ solrAdminApp.config([
 
   return {request: started, response: ended, responseError: failed};
 })
-// NOCOMMIT First iteration    
+// Intercept authentication request from Solr and forward to /solr/#/login    
 .factory('authInterceptor', function($q, $rootScope, $location, $timeout, $injector) {
   var started = function(config) {
-    console.log("Request config headers: " + JSON.stringify(config.headers, undefined, 2));
-    if (sessionStorage.getItem("auth.header") && !config.headers['Authorization']) {
+    if (sessionStorage.getItem("auth.header")) {
       config.headers['Authorization'] = sessionStorage.getItem("auth.header");
-      console.log("We have a logged in user with header " + sessionStorage.getItem("auth.username") + ", appending header " + sessionStorage.getItem("auth.header"));
-    } else {
-      console.log("Not adding headers. Have auth.username=" + sessionStorage.getItem("auth.username") + ", auth.header=" + sessionStorage.getItem("auth.header") + ", config.headers=" + config.headers['Authorization']);
+      console.log("Added Authorization header for user " + sessionStorage.getItem("auth.username"));
     }
     return config || $q.when(config);
   };
 
   var ended = function(response) {
-    // console.log("Response headers: " + JSON.stringify(response.headers(), undefined, 2));
     return response || $q.when(response);
   };
 
   var failed = function(rejection) {
-    console.log("Failed with rejection " + JSON.stringify(rejection, undefined, 2));
     if (rejection.status === 401) {
-      console.log("Status code is 401");
       var headers = rejection.headers();
-      console.log("Headers are " + JSON.stringify(headers, undefined, 2));
       var wwwAuthHeader = headers['www-authenticate'];
       sessionStorage.setItem("auth.wwwAuthHeader", wwwAuthHeader);
       var authDataHeader = headers['X-Solr-AuthData'];
       if (authDataHeader !== null) {
         sessionStorage.setItem("auth.config", authDataHeader);
       }
-      console.log("Got WWW-Authenticate header: " + wwwAuthHeader + " and X-Solr-AuthData: " + authDataHeader);
-      var authType = wwwAuthHeader.split(" ")[0];
-      console.log("AuthType is: " + authType);
-      sessionStorage.setItem("auth.type", authType);
       if ($location.path() === '/login') {
         sessionStorage.setItem("auth.location", "/");
       } else {
         sessionStorage.setItem("auth.location", $location.path());
       }
+      sessionStorage.removeItem("auth.scheme");
+      sessionStorage.removeItem("auth.realm");
       sessionStorage.removeItem("auth.username");
       sessionStorage.removeItem("auth.header");
-      // $http.defaults.headers.common.Authorization = null;
+      console.log("Solr is asking for authentication: " + wwwAuthHeader);
       $location.path('/login');
     } else {
-      console.log("Rejection status is " + rejection.status)
       $rootScope.$broadcast('loadingStatusInactive');
       return $q.reject(rejection);    }
   };
