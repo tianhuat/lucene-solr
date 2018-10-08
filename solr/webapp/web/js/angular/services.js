@@ -293,30 +293,27 @@ solrAdminServices.factory('System',
         service.SetCredentials = function (username, password) {
           var authdata = Base64.encode(username + ':' + password);
 
-          sessionStorage.setItem("auth.username", username);
-          $rootScope.username = username;
-
-          $rootScope.globals = {
-            currentUser: {
-              username: username,
-              authdata: authdata
-            }
-          };
-
-          // $http.defaults.headers.common['Authorization'] = 'Basic ' + authdata; // jshint ignore:line
-          $http.defaults.headers.common.Authorization = 'Basic ' + authdata;
-          // sessionStorage.setItem('globals', $rootScope.globals);
+          // $rootScope.globals = {
+          //   currentUser: {
+          //     username: username,
+          //     authdata: authdata
+          //   }
+          // };
+          //
+          sessionStorage.setItem('globals', $rootScope.globals);
           sessionStorage.setItem("auth.header", authdata);
+          sessionStorage.setItem("auth.username", username);
+          // $http.defaults.headers.common.Authorization = authdata;
           console.log("Stored auth data on session storage");
         };
 
         service.ClearCredentials = function () {
           $rootScope.globals = {};
-          // sessionStorage.removeItem('globals');
+          sessionStorage.removeItem('globals');
           sessionStorage.removeItem("auth.header");
           sessionStorage.removeItem("auth.username");
           sessionStorage.removeItem("auth.wwwAuthHeader");
-          $http.defaults.headers.common.Authorization = null;
+          // $http.defaults.headers.common.Authorization = null;
           console.log("Cleared stored auth data");
         };
 

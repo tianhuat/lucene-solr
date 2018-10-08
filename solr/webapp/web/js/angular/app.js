@@ -376,21 +376,18 @@ solrAdminApp.config([
 // NOCOMMIT First iteration    
 .factory('authInterceptor', function($q, $rootScope, $location, $timeout, $injector) {
   var started = function(config) {
-    console.log("Request config: " + JSON.stringify(config, undefined, 2));
-    // var ah = "Basic c29scjpyb2Nrcw==";  // solr / SolrRocks
-    // config.headers['Authorization'] = ah;
-    // console.log("Added authorization header " + ah);
-    if (sessionStorage.getItem("auth.header") !== null) {
-      if (config.headers['Authorization'] === null) {
-        config.headers['Authorization'] = sessionStorage.getItem("auth.header");
-        console.log("We have a logged in user with header " + sessionStorage.getItem("auth.username") + ", appending header");
-      }
+    console.log("Request config headers: " + JSON.stringify(config.headers, undefined, 2));
+    if (sessionStorage.getItem("auth.header") && !config.headers['Authorization']) {
+      config.headers['Authorization'] = sessionStorage.getItem("auth.header");
+      console.log("We have a logged in user with header " + sessionStorage.getItem("auth.username") + ", appending header " + sessionStorage.getItem("auth.header"));
+    } else {
+      console.log("Not adding headers. Have auth.username=" + sessionStorage.getItem("auth.username") + ", auth.header=" + sessionStorage.getItem("auth.header") + ", config.headers=" + config.headers['Authorization']);
     }
     return config || $q.when(config);
   };
 
   var ended = function(response) {
-    console.log("Response headers: " + JSON.stringify(response.headers(), undefined, 2));
+    // console.log("Response headers: " + JSON.stringify(response.headers(), undefined, 2));
     return response || $q.when(response);
   };
 
@@ -410,15 +407,19 @@ solrAdminApp.config([
       var authType = wwwAuthHeader.split(" ")[0];
       console.log("AuthType is: " + authType);
       sessionStorage.setItem("auth.type", authType);
-      sessionStorage.setItem("auth.location", $location.path());
+      if ($location.path() === '/login') {
+        sessionStorage.setItem("auth.location", "/");
+      } else {
+        sessionStorage.setItem("auth.location", $location.path());
+      }
       sessionStorage.removeItem("auth.username");
       sessionStorage.removeItem("auth.header");
+      // $http.defaults.headers.common.Authorization = null;
       $location.path('/login');
     } else {
       console.log("Rejection status is " + rejection.status)
-    }
-    $rootScope.$broadcast('loadingStatusInactive');
-    return $q.reject(rejection);
+      $rootScope.$broadcast('loadingStatusInactive');
+      return $q.reject(rejection);    }
   };
 
   return {request: started, response: ended, responseError: failed};
@@ -429,27 +430,6 @@ solrAdminApp.config([
   // Force BasicAuth plugin to serve us a 'Authorization: xBasic xxxx' header so browser will not pop up login dialogue
   $httpProvider.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
 })
-    
-    
-// NOCOMMIT: just for testing     
-// .run(['$rootScope', '$location', '$cookieStore', '$http',
-//   function ($rootScope, $location, $cookieStore, $http) {
-//     // keep user logged in after page refresh
-//     // Replace with interceptor
-//     $rootScope.globals = $cookieStore.get('globals') || {};
-//     if ($rootScope.globals.currentUser) {
-//       $http.defaults.headers.common['Authorization'] = 'Basic ' + $rootScope.globals.currentUser.authdata; // jshint ignore:line
-//     }
-//
-//     // $rootScope.$on('$locationChangeStart', function (event, next, current) {
-//     //   // redirect to login page if not logged in
-//     //   if ($location.path() !== '/login' && !$rootScope.globals.currentUser) {
-//     //     $location.path('/login');
-//     //   }
-//     // });
-//   }])
-
-    
 .directive('fileModel', function ($parse) {
   return {
     restrict: 'A',

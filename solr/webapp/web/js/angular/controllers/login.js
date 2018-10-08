@@ -37,17 +37,6 @@ solrAdminApp.controller('LoginController',
           AuthenticationService.SetCredentials($scope.username, $scope.password);
           console.log("Redirecting back to " + $scope.authLocation);
           $location.path($scope.authLocation); // Redirect to the location that caused the login prompt
-          
-          // TODO: "login" by hitting the failing URL again
-          // AuthenticationService.Login($scope.username, $scope.password, function (response) {
-          //   if (response.success) {
-          //     AuthenticationService.SetCredentials($scope.username, $scope.password);
-          //     $location.path('/');
-          //   } else {
-          //     $scope.error = response.message;
-          //     $scope.dataLoading = false;
-          //   }
-          // });
         };
         
         $scope.logout = function() {
