@@ -59,13 +59,13 @@ Upgrade Notes
 New Features
 ----------------------
 
-SOLR-12591: Expand the set of recognized date format patterns of schemaless mode to subsume those handled by the
+* SOLR-12591: Expand the set of recognized date format patterns of schemaless mode to subsume those handled by the
   "extract" contrib (Solr Cell / Tika).  This is primarily a change in configuration of the default configSet for more
   patterns, but also included enabling "lenient" parsing in ParseDateFieldUpdateProcessorFactory.  The default
   locale was changed from ROOT to en_US since well-known patterns assume this locale.
   (David Smiley, Bar Rotstein)
 
-SOLR-12593: The default configSet now includes an "ignored_*" dynamic field.  (David Smiley)
+* SOLR-12593: The default configSet now includes an "ignored_*" dynamic field.  (David Smiley)
 
 Optimizations
 ----------------------
@@ -148,6 +148,8 @@ Other Changes
 Bug Fixes
 ----------------------
 
+* SOLR-12803: Ensure ConcurrentUpdateSolrClient sends documents to correct collection (Jason Gerlowski)
+
 * SOLR-11836: FacetStream works with bucketSizeLimit of -1 which will fetch all the buckets.
   (Alfonso Muñoz-Pomer Fuentes, Amrit Sarkar via Varun Thacker)
 
@@ -164,10 +166,18 @@ Bug Fixes
 
 * SOLR-12814: Metrics history causing "HttpParser URI is too large >8192" when many collections (janhoy)
 
+* SOLR-12836: ZkController creates a cloud solr client with no connection or read timeouts. Now the http client
+  created by the update shard handler is used instead. (shalin)
+
 Improvements
 ----------------------
+
 * SOLR-12767: Solr now always includes in the response of update requests the achieved replication factor
    (Tomás Fernández Löbbe)
+
+* SOLR-12782: UninvertingReader wrapping is now a bit more lightweight: Does not create FieldInfo for fields that
+  can't be uninverted (saves mem) and can avoid wrapping the reader altogether if there's nothing to uninvert.
+  IndexSchema.getUninversionMap refactored to getUninversionMapper and no longer merges FieldInfos. (David Smiley)
 
 ==================  7.5.0 ==================
 
