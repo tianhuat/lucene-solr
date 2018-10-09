@@ -17,53 +17,59 @@ limitations under the License.
 <div id="login" class="clearfix">
 
   <div ng-show="authScheme === 'Basic'">
-    <h1>Basic Authentication</h1>     
-    
-    <p>Scheme: {{authScheme}}</p>
-    <p>Realm: {{authRealm}}</p>
-    <p>WWW-Header: {{wwwAuthHeader}}</p>
-    <p>Config: {{authConfig}}</p>
-    <p>Redirect: {{authLocation}}</p>
-    <p>LoggedinUser: {{authLoggedinUser}}</p>
-    <p>AuthHeader: {{authHeader}}</p>
+    <h1>Basic Authentication</h1>
+    <div ng-show="statusText !== 'require authentication'">
+      <b>{{statusText}}</b>
+    </div>
+    <div ng-show="!isLoggedIn()">
+      <p>
+        Solr requires authentication for resource {{authLocation === '/' ? 'Dashboard' : authLocation}}.<br/>
+        Please log in with your username and password for realm {{authRealm}}.
+      </p>
+      <br/>
+      <div ng-show="error" class="alert alert-danger">{{error}}</div>
+      <form name="form" ng-submit="login()" role="form">
+        <div class="form-group">
+          <label for="username">Username</label>
+          <input type="text" name="username" id="username" class="form-control" ng-model="username" required />
+          <span ng-show="form.username.$dirty && form.username.$error.required" class="help-block">Username is required</span>
+        </div>
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" name="password" id="password" class="form-control" ng-model="password" required />
+          <span ng-show="form.password.$dirty && form.password.$error.required" class="help-block">Password is required</span>
+        </div>
+        <br/>
+        <div class="form-actions">
+          <button type="submit" ng-disabled="form.$invalid" class="btn btn-danger">Login</button>
+        </div>
+      </form>
+    </div>
 
-    <div ng-show="error" class="alert alert-danger">{{error}}</div>
-    <form name="form" ng-submit="login()" role="form" ng-show="!isLoggedIn()">
-        <div class="form-group">
-            <label for="username">Username</label>
-            <i class="fa fa-key"></i>
-            <input type="text" name="username" id="username" class="form-control" ng-model="username" required />
-            <span ng-show="form.username.$dirty && form.username.$error.required" class="help-block">Username is required</span>
-        </div>
-        <div class="form-group">
-            <label for="password">Password</label>
-            <i class="fa fa-lock"></i>
-            <input type="password" name="password" id="password" class="form-control" ng-model="password" required />
-            <span ng-show="form.password.$dirty && form.password.$error.required" class="help-block">Password is required</span>
-        </div>
+    <div ng-show="isLoggedIn()">
+      <p>
+        Logged in as user {{authLoggedinUser}}. Realm={{authRealm}}.<br/>
+      </p>
+      <br/>
+      <form name="logoutForm" ng-submit="logout()" role="form" ng-show="isLoggedIn()">
         <div class="form-actions">
-            <button type="submit" ng-disabled="form.$invalid || dataLoading" class="btn btn-danger">Login</button>
-            <img ng-if="dataLoading" src="data:image/gif;base64,R0lGODlhEAAQAPIAAP///wAAAMLCwkJCQgAAAGJiYoKCgpKSkiH/C05FVFNDQVBFMi4wAwEAAAAh/hpDcmVhdGVkIHdpdGggYWpheGxvYWQuaW5mbwAh+QQJCgAAACwAAAAAEAAQAAADMwi63P4wyklrE2MIOggZnAdOmGYJRbExwroUmcG2LmDEwnHQLVsYOd2mBzkYDAdKa+dIAAAh+QQJCgAAACwAAAAAEAAQAAADNAi63P5OjCEgG4QMu7DmikRxQlFUYDEZIGBMRVsaqHwctXXf7WEYB4Ag1xjihkMZsiUkKhIAIfkECQoAAAAsAAAAABAAEAAAAzYIujIjK8pByJDMlFYvBoVjHA70GU7xSUJhmKtwHPAKzLO9HMaoKwJZ7Rf8AYPDDzKpZBqfvwQAIfkECQoAAAAsAAAAABAAEAAAAzMIumIlK8oyhpHsnFZfhYumCYUhDAQxRIdhHBGqRoKw0R8DYlJd8z0fMDgsGo/IpHI5TAAAIfkECQoAAAAsAAAAABAAEAAAAzIIunInK0rnZBTwGPNMgQwmdsNgXGJUlIWEuR5oWUIpz8pAEAMe6TwfwyYsGo/IpFKSAAAh+QQJCgAAACwAAAAAEAAQAAADMwi6IMKQORfjdOe82p4wGccc4CEuQradylesojEMBgsUc2G7sDX3lQGBMLAJibufbSlKAAAh+QQJCgAAACwAAAAAEAAQAAADMgi63P7wCRHZnFVdmgHu2nFwlWCI3WGc3TSWhUFGxTAUkGCbtgENBMJAEJsxgMLWzpEAACH5BAkKAAAALAAAAAAQABAAAAMyCLrc/jDKSatlQtScKdceCAjDII7HcQ4EMTCpyrCuUBjCYRgHVtqlAiB1YhiCnlsRkAAAOwAAAAAAAAAAAA==" />
+          <button type="submit" class="btn btn-danger">Logout</button>
         </div>
-    </form>
-    <form name="logoutForm" ng-submit="logout()" role="form" ng-show="isLoggedIn()">
-        <div class="form-actions">
-            <button type="submit" class="btn btn-danger">Logout</button>
-        </div>
-    </form>
-    
+      </form>
+    </div>
+
   </div>
-  
-  
+
+
   <div ng-show="authScheme === 'unknown'">
-    <h1>Authentication type not supported</h1>     
-    
+    <h1>Authentication type not supported</h1>
+
     <p>Type: {{authScheme}}</p>
     <p>WWW-Header: {{wwwAuthHeader}}</p>
     <p>Config: {{authConfig}}</p>
     <p>Redirect: {{authLocation}}</p>
     <p>LoggedinUser: {{authLoggedinUser}}</p>
 
-    You cannot use Solr's Admin UI for this operation. Please use another client that supports this type. 
+    You cannot use Solr's Admin UI for this operation. Please use another client that supports this type.
   </div>
 </div>

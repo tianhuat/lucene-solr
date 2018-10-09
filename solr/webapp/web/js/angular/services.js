@@ -268,28 +268,6 @@ solrAdminServices.factory('System',
       function (Base64, $http, $rootScope, $timeout) {
         var service = {};
 
-        service.Login = function (username, password, callback) {
-
-          /* NOCOMMIT Dummy authentication for testing, uses $timeout to simulate api call
-           ----------------------------------------------*/
-          // $timeout(function () {
-          //   var response = { success: username === 'test' && password === 'test' };
-          //   if (!response.success) {
-          //     response.message = 'Username or password is incorrect';
-          //   }
-          //   callback(response);
-          // }, 1000);
-
-
-          /* Use this for real authentication
-           ----------------------------------------------*/
-          // $http.post('/api/authenticate', { username: username, password: password })
-          //    .success(function (response) {
-          //        callback(response);
-          //    });
-
-        };
-
         service.SetCredentials = function (username, password) {
           var authdata = Base64.encode(username + ':' + password);
 
@@ -300,22 +278,21 @@ solrAdminServices.factory('System',
           //   }
           // };
           //
-          sessionStorage.setItem('globals', $rootScope.globals);
+          // sessionStorage.setItem('globals', $rootScope.globals);
           sessionStorage.setItem("auth.header", "Basic " + authdata);
           sessionStorage.setItem("auth.username", username);
-          // $http.defaults.headers.common.Authorization = "Basic " + authdata;
           console.log("Stored auth data on session storage");
         };
 
         service.ClearCredentials = function () {
-          $rootScope.globals = {};
-          sessionStorage.removeItem('globals');
+          // $rootScope.globals = {};
+          // sessionStorage.removeItem('globals');
           sessionStorage.removeItem("auth.header");
           sessionStorage.removeItem("auth.scheme");
           sessionStorage.removeItem("auth.realm");
           sessionStorage.removeItem("auth.username");
           sessionStorage.removeItem("auth.wwwAuthHeader");
-          // $http.defaults.headers.common.Authorization = null;
+          sessionStorage.removeItem("auth.statusText");
           console.log("Cleared stored auth data");
         };
 

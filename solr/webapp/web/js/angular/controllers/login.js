@@ -16,8 +16,10 @@
 */
 
 solrAdminApp.controller('LoginController',
-    ['$scope', '$routeParams', '$rootScope', '$location', 'AuthenticationService',
-      function ($scope, $routeParams, $rootScope, $location, AuthenticationService) {
+    ['$scope', '$routeParams', '$rootScope', '$location', 'AuthenticationService', 'Constants',
+      function ($scope, $routeParams, $rootScope, $location, AuthenticationService, Constants) {
+        $scope.resetMenu("login", Constants.IS_ROOT_PAGE);
+
         // Session variables set in app.js 401 interceptor
         var wwwAuthHeader = sessionStorage.getItem("auth.wwwAuthHeader");
         var authDataHeader = sessionStorage.getItem("auth.config");
@@ -45,6 +47,7 @@ solrAdminApp.controller('LoginController',
 
         $scope.authScheme = sessionStorage.getItem("auth.scheme");
         $scope.wwwAuthHeader = sessionStorage.getItem("auth.wwwAuthHeader");
+        $scope.statusText = sessionStorage.getItem("auth.statusText");
         $scope.authConfig = sessionStorage.getItem("auth.config");
         $scope.authLocation = sessionStorage.getItem("auth.location");
         $scope.authLoggedinUser = sessionStorage.getItem("auth.username");

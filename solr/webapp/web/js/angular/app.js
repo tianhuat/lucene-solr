@@ -384,6 +384,10 @@ solrAdminApp.config([
   };
 
   var ended = function(response) {
+    sessionStorage.removeItem("auth.statusText");
+    if ($location.path() !== '/login') {
+      sessionStorage.removeItem("http401");
+    }
     return response || $q.when(response);
   };
 
@@ -392,6 +396,7 @@ solrAdminApp.config([
       var headers = rejection.headers();
       var wwwAuthHeader = headers['www-authenticate'];
       sessionStorage.setItem("auth.wwwAuthHeader", wwwAuthHeader);
+      sessionStorage.setItem("auth.statusText", rejection.statusText);
       var authDataHeader = headers['X-Solr-AuthData'];
       if (authDataHeader !== null) {
         sessionStorage.setItem("auth.config", authDataHeader);
@@ -401,6 +406,7 @@ solrAdminApp.config([
       } else {
         sessionStorage.setItem("auth.location", $location.path());
       }
+      sessionStorage.setItem("http401", "true");
       sessionStorage.removeItem("auth.scheme");
       sessionStorage.removeItem("auth.realm");
       sessionStorage.removeItem("auth.username");
@@ -489,6 +495,8 @@ solrAdminApp.controller('MainController', function($scope, $route, $rootScope, $
     $scope.showingLogging = page.lastIndexOf("logging", 0) === 0;
     $scope.showingCloud = page.lastIndexOf("cloud", 0) === 0;
     $scope.page = page;
+    $scope.currentUser = sessionStorage.getItem("auth.username");
+    $scope.http401 = sessionStorage.getItem("http401");
   };
 
   $scope.ping = function() {

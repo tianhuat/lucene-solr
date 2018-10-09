@@ -34,6 +34,7 @@ limitations under the License.
   <link rel="stylesheet" type="text/css" href="css/angular/index.css?_=${version}">
   <link rel="stylesheet" type="text/css" href="css/angular/java-properties.css?_=${version}">
   <link rel="stylesheet" type="text/css" href="css/angular/logging.css?_=${version}">
+  <link rel="stylesheet" type="text/css" href="css/angular/login.css?_=${version}">
   <link rel="stylesheet" type="text/css" href="css/angular/menu.css?_=${version}">
   <link rel="stylesheet" type="text/css" href="css/angular/plugins.css?_=${version}">
   <link rel="stylesheet" type="text/css" href="css/angular/documents.css?_=${version}">
@@ -140,7 +141,7 @@ limitations under the License.
         <div>
 
           <ul id="menu">
-            <li id="login" class="global" ng-class="{active:page=='login'}"><p><a href="#/login">Login {{$root.globals.currentUser.username}} {{$root.globals}}</a></p></li>
+            <li id="login" class="global" ng-class="{active:page=='login'}" ng-show="http401 || currentUser"><p><a href="#/login">{{http401 ? "Login" : "Logout " + currentUser}}</a></p></li>
             
             <li id="index" class="global" ng-class="{active:page=='index'}"><p><a href="#/">Dashboard</a></p></li>
 
