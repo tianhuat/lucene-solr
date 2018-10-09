@@ -384,9 +384,9 @@ solrAdminApp.config([
   };
 
   var ended = function(response) {
-    sessionStorage.removeItem("auth.statusText");
     if ($location.path() !== '/login') {
       sessionStorage.removeItem("http401");
+      sessionStorage.removeItem("auth.statusText");
     }
     return response || $q.when(response);
   };

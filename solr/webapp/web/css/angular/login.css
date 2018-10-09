@@ -41,6 +41,14 @@ limitations under the License.
   margin-bottom: 1rem;
 }
 
+#content #login .login-error
+{
+  font-size: 1rem;
+  color: red;
+  margin-top: 10px;
+  margin-bottom: 10px;
+}
+
 #content #login button {
   border-radius: 0;
 }
